@@ -1,6 +1,7 @@
 import streamlit as st
 from src.ingest import run_ingestion
 from src.sql_store import query
+from src.governance import get_allowed_tiers, get_stale_documents, detect_gaps, ROLE_ACCESS
 
 st.set_page_config(page_title="Needletail Company Brain", page_icon="🧠", layout="centered")
 
@@ -53,13 +54,50 @@ except Exception as e:
     ingestion_ok = False
 
 st.divider()
+st.subheader("Layer 3 — Governance & provisioning")
+
+if ingestion_ok:
+    gov_col1, gov_col2 = st.columns(2)
+
+    with gov_col1:
+        st.markdown("**Freshness monitor** — docs past 90 days unverified")
+        stale = get_stale_documents()
+        if stale.empty:
+            st.write("None currently.")
+        else:
+            for _, row in stale.iterrows():
+                st.markdown(f"⚠️ **{row['title']}** — {row['days_since_verified']} days old")
+
+    with gov_col2:
+        st.markdown("**Gap detection** — repeated low-confidence topics")
+        gaps = detect_gaps()
+        if gaps.empty:
+            st.write("None currently.")
+        else:
+            for _, row in gaps.iterrows():
+                st.markdown(
+                    f"🔍 **{row['topic_tag']}** — {row['occurrences']} low-confidence "
+                    f"queries, avg confidence {row['avg_confidence']:.2f}"
+                )
+
+    with st.expander("RBAC — what each role can see"):
+        for role, tiers in ROLE_ACCESS.items():
+            st.write(f"**{role}**: {', '.join(sorted(tiers))}")
+        st.caption(
+            "This is re-checked on every query, dashboard view, and thread open — "
+            "never cached per document, so access always reflects the current viewer."
+        )
+else:
+    st.info("Governance checks run once ingestion succeeds.")
+
+st.divider()
 st.subheader("Build status")
 
 layers = [
     ("Repo scaffold & deployment pipeline", True),
     ("Layer 1 — Source (mock data set)", True),
     ("Layer 2 — Structure & store (Vector DB + SQL + metadata)", ingestion_ok),
-    ("Layer 3 — Governance (approval, RBAC, freshness, gap detection)", False),
+    ("Layer 3 — Governance (approval, RBAC, freshness, gap detection)", ingestion_ok),
     ("Layer 4 — Query (scoped retrieval)", False),
     ("Layer 5 — Act: Chat assistant", False),
     ("Layer 5 — Act: Threads/projects", False),
