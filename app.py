@@ -2,6 +2,7 @@ import streamlit as st
 from src.ingest import run_ingestion
 from src.sql_store import query
 from src.governance import get_allowed_tiers, get_stale_documents, detect_gaps, ROLE_ACCESS
+from src.retrieval import retrieve
 
 st.set_page_config(page_title="Needletail Company Brain", page_icon="🧠", layout="centered")
 
@@ -91,6 +92,37 @@ else:
     st.info("Governance checks run once ingestion succeeds.")
 
 st.divider()
+st.subheader("Layer 4 — Query (scoped retrieval) — test harness")
+
+if ingestion_ok:
+    test_role = st.selectbox("Test as role:", list(ROLE_ACCESS.keys()))
+    test_question = st.text_input("Test question:", "What's our pipeline for enterprise DSOs?")
+
+    if st.button("Run retrieval"):
+        try:
+            result = retrieve(test_question, test_role)
+            st.write(f"Allowed tiers: {result['allowed_tiers']}")
+            if result["blocked_tables"]:
+                st.warning(f"Blocked by access tier: {result['blocked_tables']}")
+            st.text_area(
+                "Assembled context (what the LLM would see):",
+                result["context_text"],
+                height=300,
+            )
+            with st.expander("Raw vector hits"):
+                st.json(result["vector_hits"])
+            with st.expander("Raw SQL results"):
+                for t, df in result["sql_results"].items():
+                    st.write(t)
+                    st.dataframe(df)
+        except Exception as e:
+            st.error(f"Retrieval failed: {e}")
+    else:
+        st.caption("Pick a role and a question, then click Run retrieval to test Layer 4 directly.")
+else:
+    st.info("Query layer test runs once ingestion succeeds.")
+
+st.divider()
 st.subheader("Build status")
 
 layers = [
@@ -98,7 +130,7 @@ layers = [
     ("Layer 1 — Source (mock data set)", True),
     ("Layer 2 — Structure & store (Vector DB + SQL + metadata)", ingestion_ok),
     ("Layer 3 — Governance (approval, RBAC, freshness, gap detection)", ingestion_ok),
-    ("Layer 4 — Query (scoped retrieval)", False),
+    ("Layer 4 — Query (scoped retrieval)", ingestion_ok),
     ("Layer 5 — Act: Chat assistant", False),
     ("Layer 5 — Act: Threads/projects", False),
     ("Layer 5 — Act: Build API demo", False),
