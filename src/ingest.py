@@ -17,6 +17,7 @@ from src.vectorstore import add_chunks, count as vector_count
 from src.sql_store import load_csv_as_table, load_metadata_table, query
 
 DATA_DIR = "data/mock"
+QUERY_LOG_PATH = os.path.join(DATA_DIR, "seed", "query_log_seed.csv")
 
 
 def run_ingestion() -> dict:
@@ -86,6 +87,11 @@ def run_ingestion() -> dict:
             "rows": n_rows,
             "access_tier": row["access_tier"],
         }
+
+    # Seeded low-confidence query log, for gap detection (Layer 3) to read.
+    if os.path.exists(QUERY_LOG_PATH):
+        n_log_rows = load_csv_as_table(QUERY_LOG_PATH, "query_log")
+        report["sql_tables"]["query_log"] = {"rows": n_log_rows, "access_tier": "internal_system"}
 
     report["total_chunks_embedded"] = vector_count()
     report["total_documents"] = len(report["documents"])
