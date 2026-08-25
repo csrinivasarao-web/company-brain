@@ -1,8 +1,8 @@
-# Needletail Company Brain — Prototype
+# Company Brain — Prototype
 
-A governed, retrieval-grounded knowledge system for Needletail, piloted on the
+A governed, retrieval-grounded knowledge system, piloted on the
 GTM and Human-in-the-loop Operations teams. Full architecture and reasoning
-live in the accompanying design document (`Needletail_Company_Brain_v2.docx`).
+live in the accompanying design document.
 
 ## Status
 
