@@ -56,9 +56,19 @@ def _route_sql_tables(question: str) -> list:
 
 
 def _df_to_markdown(df) -> str:
+    """Hand-rolled markdown table -- deliberately not pandas' to_markdown(),
+    which silently requires the separate `tabulate` package. Avoiding that
+    dependency avoids the failure mode entirely rather than just patching
+    requirements.txt and hoping nothing else pulls the same trick later."""
     if df.empty:
         return "(no rows)"
-    return df.to_markdown(index=False)
+    cols = [str(c) for c in df.columns]
+    lines = []
+    lines.append("| " + " | ".join(cols) + " |")
+    lines.append("| " + " | ".join(["---"] * len(cols)) + " |")
+    for _, row in df.iterrows():
+        lines.append("| " + " | ".join(str(row[c]) for c in cols) + " |")
+    return "\n".join(lines)
 
 
 def retrieve(question: str, role: str, k: int = 5) -> dict:
