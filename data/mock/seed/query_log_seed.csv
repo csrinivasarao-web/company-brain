@@ -1,0 +1,4 @@
+timestamp,asked_by_role,query_text,top_confidence_score,topic_tag,resolved
+2026-08-15T09:12:00,gtm_rep,"Does voice fallback work for Curve Dental integrations?",0.31,curve_dental_integration,false
+2026-08-17T14:03:00,gtm_rep,"What's the Curve Dental onboarding process, is it the same as Denticon?",0.28,curve_dental_integration,false
+2026-08-20T11:47:00,ops_specialist,"Curve Dental portal timeout handling - same as CareStack?",0.34,curve_dental_integration,false

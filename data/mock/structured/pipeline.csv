@@ -1,0 +1,17 @@
+deal_id,account_name,segment,stage,amount_usd,close_date,owner
+DEAL-001,Meridian Dental Partners,enterprise,negotiation,184000,2026-10-01,R. Chen
+DEAL-002,Coastal Smiles Group,mid_market,closed_won,62000,2026-06-15,J. Alvarez
+DEAL-003,Highland Family Dental Co.,mid_market,closed_won,54000,2026-01-20,R. Chen
+DEAL-004,Bluegrass Dental Group,mid_market,demo,71000,2026-10-15,J. Alvarez
+DEAL-005,Summit Ridge DSO,enterprise,prospecting,210000,2026-12-01,K. Osei
+DEAL-006,Fresh Smile Partners,smb,closed_won,18000,2026-05-10,J. Alvarez
+DEAL-007,Pacific Coast Dental Alliance,enterprise,negotiation,265000,2026-09-20,K. Osei
+DEAL-008,Northgate Dental Group,smb,closed_lost,15000,2026-04-02,J. Alvarez
+DEAL-009,Valley Family Dentistry,smb,demo,12000,2026-09-30,R. Chen
+DEAL-010,Union Square Dental Partners,mid_market,prospecting,68000,2026-11-10,K. Osei
+DEAL-011,Bayview DSO,enterprise,closed_won,198000,2026-03-01,R. Chen
+DEAL-012,Greenfield Dental Co-op,smb,closed_won,21000,2026-02-14,J. Alvarez
+DEAL-013,Cascade Dental Group,mid_market,negotiation,59000,2026-09-05,K. Osei
+DEAL-014,Ironwood DSO,enterprise,prospecting,245000,2027-01-15,K. Osei
+DEAL-015,Willowbrook Family Dental,smb,prospecting,14000,2026-10-25,R. Chen
+DEAL-016,Redstone Dental Partners,mid_market,demo,64000,2026-11-01,J. Alvarez

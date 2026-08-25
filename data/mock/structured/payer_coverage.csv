@@ -1,0 +1,21 @@
+payer_id,payer_name,region,supported,coverage_pct,integration_status,last_verified
+PAY-001,Delta Dental,National,True,98,stable,2026-08-20
+PAY-002,Cigna Dental,National,True,96,stable,2026-08-20
+PAY-003,MetLife,National,True,91,stable,2026-08-20
+PAY-004,Guardian Dental,National,True,88,unstable,2026-08-20
+PAY-005,Aetna Dental,National,True,97,stable,2026-08-20
+PAY-006,United Concordia,National,True,93,stable,2026-08-20
+PAY-007,Humana Dental,National,True,90,stable,2026-08-20
+PAY-008,Ameritas,Regional,True,85,stable,2026-08-20
+PAY-009,Principal,Regional,True,82,stable,2026-08-20
+PAY-010,Sun Life Dental,Regional,True,87,voice_fallback_pending,2026-08-20
+PAY-011,Anthem Dental,Regional,True,94,stable,2026-08-20
+PAY-012,Blue Cross Blue Shield Dental,Regional,True,92,stable,2026-08-20
+PAY-013,Renaissance Dental,Regional,True,80,voice_fallback_pending,2026-08-20
+PAY-014,DentaQuest,National,True,89,stable,2026-08-20
+PAY-015,Careington,Regional,False,0,not_supported,2026-08-20
+PAY-016,Dominion National,Regional,True,83,stable,2026-08-20
+PAY-017,Lincoln Financial Dental,Regional,True,81,voice_fallback_pending,2026-08-20
+PAY-018,Unum Dental,Regional,False,0,not_supported,2026-08-20
+PAY-019,Assurant Dental,Regional,True,86,stable,2026-08-20
+PAY-020,Liberty Dental Plan,Regional,True,95,stable,2026-08-20
