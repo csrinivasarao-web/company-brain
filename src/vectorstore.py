@@ -24,5 +24,18 @@ def add_chunks(ids, embeddings, documents, metadatas):
     collection.add(ids=ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
 
 
+def search(query_embedding, allowed_tiers, n_results=5):
+    """Access control happens HERE, inside the query itself, via Chroma's
+    `where` filter -- not by fetching everything and dropping results
+    afterward. A chunk outside `allowed_tiers` is never returned, full stop.
+    """
+    collection = get_collection()
+    return collection.query(
+        query_embeddings=[query_embedding],
+        n_results=n_results,
+        where={"access_tier": {"$in": list(allowed_tiers)}},
+    )
+
+
 def count() -> int:
     return get_collection().count()
