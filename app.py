@@ -1,4 +1,3 @@
-import pandas as pd
 import streamlit as st
 from src.ingest import run_ingestion
 from src.sql_store import query
@@ -10,6 +9,12 @@ from src.threads import (
     get_thread, get_messages, append_message, list_visible_threads,
     create_project, list_projects_for_user,
 )
+from src.dashboards import (
+    create_dashboard, share_dashboard, revoke_dashboard_share,
+    get_shared_with as get_dashboard_shared_with,
+    list_visible_dashboards, get_dashboard_result,
+)
+from src.aggregation import TABLE_AGG_CONFIG, compute_aggregation
 
 st.set_page_config(page_title="Needletail Company Brain", page_icon="🧠", layout="wide")
 
@@ -24,11 +29,6 @@ def _render_sources(retrieval: dict):
             st.write("**Structured data:**")
             for t in retrieval["sql_results"]:
                 st.markdown(f"- `{t}` table")
-        if retrieval.get("aggregations"):
-            st.write("**Computed aggregation (calculated in code with pandas, not by the model):**")
-            for t, agg in retrieval["aggregations"].items():
-                st.caption(f"`{t}` — {agg['spec'].get('agg_func')} grouped by {agg['spec'].get('group_by') or '(none — overall total)'}")
-                st.dataframe(pd.DataFrame(agg["records"]), use_container_width=True)
         if retrieval.get("blocked_tables"):
             st.write("**Blocked by access tier:**")
             for t in retrieval["blocked_tables"]:
@@ -106,7 +106,7 @@ with st.expander("⚙️ System status — ingestion, governance, retrieval diag
     st.subheader("Layer 4 raw test harness (debug retrieval directly, without the chat layer)")
     if ingestion_ok:
         test_role = st.selectbox("Test as role:", list(ROLE_ACCESS.keys()), key="l4_role")
-        test_question = st.text_input("Test question:", "Aggregate the amount by segment and stage", key="l4_question")
+        test_question = st.text_input("Test question:", "What's our pipeline for enterprise DSOs?", key="l4_question")
         if st.button("Run retrieval", key="l4_run"):
             try:
                 result = retrieve(test_question, test_role)
@@ -120,13 +120,6 @@ with st.expander("⚙️ System status — ingestion, governance, retrieval diag
                     for t, df in result["sql_results"].items():
                         st.write(t)
                         st.dataframe(df)
-                with st.expander("Raw aggregations (computed with pandas)"):
-                    if result["aggregations"]:
-                        for t, agg in result["aggregations"].items():
-                            st.write(f"`{t}` — spec: {agg['spec']}")
-                            st.dataframe(agg["df"])
-                    else:
-                        st.write("No aggregation triggered for this question.")
             except Exception as e:
                 st.error(f"Retrieval failed: {e}")
     else:
@@ -139,11 +132,11 @@ with st.expander("⚙️ System status — ingestion, governance, retrieval diag
         ("Layer 1 — Source (mock data set)", True),
         ("Layer 2 — Structure & store (Vector DB + SQL + metadata)", ingestion_ok),
         ("Layer 3 — Governance (approval, RBAC, freshness, gap detection)", ingestion_ok),
-        ("Layer 4 — Query (scoped retrieval + real aggregation)", ingestion_ok),
-        ("Layer 5 — Act: Chat assistant (accurate aggregation)", ingestion_ok),
+        ("Layer 4 — Query (scoped retrieval)", ingestion_ok),
+        ("Layer 5 — Act: Chat assistant", ingestion_ok),
         ("Layer 5 — Act: Threads/projects (message-level access)", ingestion_ok),
         ("Layer 5 — Act: Build API demo", ingestion_ok),
-        ("Layer 5 — Act: No-code dashboard builder", False),
+        ("Layer 5 — Act: No-code dashboard builder", ingestion_ok),
         ("Layer 5 — Act: Proactive digest", False),
     ]
     for label, done in layers:
@@ -157,6 +150,8 @@ if "selected_thread_id" not in st.session_state:
     st.session_state.selected_thread_id = None
 if "active_tool" not in st.session_state:
     st.session_state.active_tool = None
+if "selected_dashboard_id" not in st.session_state:
+    st.session_state.selected_dashboard_id = None
 
 with st.sidebar:
     st.markdown("### 🧠 Company Brain")
@@ -177,6 +172,27 @@ with st.sidebar:
     if st.button("🔧 Pipeline Lookup", key="tool_pipeline_btn", use_container_width=True):
         st.session_state.active_tool = "pipeline_lookup"
         st.session_state.selected_thread_id = None
+        st.session_state.selected_dashboard_id = None
+        st.rerun()
+
+    st.divider()
+
+    st.markdown("**Dashboards**")
+    visible_dashboards = list_visible_dashboards(current_user_id)
+    if not visible_dashboards:
+        st.caption("No dashboards yet.")
+    for d in visible_dashboards:
+        active = st.session_state.get("selected_dashboard_id") == d["dashboard_id"]
+        label = ("● " if active else "📊 ") + d["title"]
+        if st.button(label, key=f"dash_{d['dashboard_id']}", use_container_width=True):
+            st.session_state.selected_dashboard_id = d["dashboard_id"]
+            st.session_state.active_tool = None
+            st.session_state.selected_thread_id = None
+            st.rerun()
+    if st.button("+ New dashboard", key="new_dash_btn", use_container_width=True):
+        st.session_state.active_tool = "dashboard_builder"
+        st.session_state.selected_thread_id = None
+        st.session_state.selected_dashboard_id = None
         st.rerun()
 
     st.divider()
@@ -199,6 +215,7 @@ with st.sidebar:
         if st.button(label, key=f"{key_prefix}_{t['thread_id']}", use_container_width=True):
             st.session_state.selected_thread_id = t["thread_id"]
             st.session_state.active_tool = None
+            st.session_state.selected_dashboard_id = None
             st.rerun()
 
     if projects:
@@ -219,6 +236,7 @@ with st.sidebar:
                         new_id = create_thread(new_title.strip(), current_user_id, project_id=proj["project_id"])
                         st.session_state.selected_thread_id = new_id
                         st.session_state.active_tool = None
+                        st.session_state.selected_dashboard_id = None
                         st.rerun()
                     else:
                         st.warning("Give the chat a title first.")
@@ -238,6 +256,7 @@ with st.sidebar:
             new_id = create_thread(new_chat_title.strip(), current_user_id, project_id=None)
             st.session_state.selected_thread_id = new_id
             st.session_state.active_tool = None
+            st.session_state.selected_dashboard_id = None
             st.rerun()
         else:
             st.warning("Give the chat a title first.")
@@ -255,8 +274,104 @@ with st.sidebar:
             st.warning("Give the project a name first.")
 
 selected_thread_id = st.session_state.selected_thread_id
+selected_dashboard_id = st.session_state.selected_dashboard_id
 
-if st.session_state.active_tool == "pipeline_lookup":
+if st.session_state.active_tool == "dashboard_builder":
+    st.title("📊 New dashboard")
+    st.caption(
+        "Saves a RECIPE (table, group-by, aggregation function) — never a "
+        "result. Every time this dashboard is opened, it re-runs the real "
+        "pandas aggregation live, through the same access-scoped retrieve() "
+        "path as everything else. Nothing here is cached or pre-computed."
+    )
+
+    table_name = st.selectbox("Table:", list(TABLE_AGG_CONFIG.keys()), key="db_table")
+    config = TABLE_AGG_CONFIG[table_name]
+    columns = sorted(set(config["groupable_synonyms"].values()))
+
+    group_by = st.multiselect("Group by:", columns, key="db_group_by")
+    agg_func = st.selectbox("Function:", ["sum", "mean", "count"], key="db_agg_func")
+    agg_column = None
+    if agg_func != "count":
+        agg_column = st.selectbox("Aggregate column:", [config["numeric_column"]], key="db_agg_col")
+
+    if st.button("▶ Preview (live, real pandas)", key="db_preview"):
+        df = query(f"SELECT * FROM {table_name}")
+        spec = {"group_by": group_by, "agg_func": agg_func, "numeric_col": agg_column}
+        try:
+            preview_df = compute_aggregation(df, spec)
+            st.dataframe(preview_df, use_container_width=True)
+            st.session_state.db_preview_ok = True
+        except Exception as e:
+            st.error(f"Couldn't compute that: {e}")
+            st.session_state.db_preview_ok = False
+
+    st.divider()
+    dash_title = st.text_input("Dashboard title:", placeholder="e.g. Pipeline by segment", key="db_title")
+    if st.button("💾 Save as Dashboard", key="db_save"):
+        if not dash_title.strip():
+            st.warning("Give it a title first.")
+        else:
+            new_id = create_dashboard(
+                dash_title.strip(), current_user_id, table_name,
+                group_by=group_by, agg_func=agg_func, agg_column=agg_column,
+            )
+            st.session_state.selected_dashboard_id = new_id
+            st.session_state.active_tool = None
+            st.rerun()
+
+elif selected_dashboard_id is not None:
+    result = get_dashboard_result(selected_dashboard_id, current_user_id)
+
+    if not result["ok"]:
+        if result["reason"] == "not_shared":
+            st.warning("This dashboard isn't shared with you. Pick another from the sidebar.")
+            st.session_state.selected_dashboard_id = None
+            st.stop()
+        elif result["reason"] == "access_blocked":
+            d = result["dashboard"]
+            st.subheader(d["title"])
+            st.error(
+                f"🔒 Blocked by your current role's access ({current_role}). "
+                f"This dashboard is built on `{d['table_name']}`, which requires "
+                f"`{result['required_tier']}` access. This is checked fresh every "
+                f"time you open it, against your CURRENT role — not whoever "
+                f"created it, and not cached from a previous visit."
+            )
+        else:
+            st.warning("This dashboard no longer exists.")
+            st.session_state.selected_dashboard_id = None
+            st.stop()
+    else:
+        d = result["dashboard"]
+        st.subheader(f"📊 {d['title']}")
+        st.caption(
+            f"Created by {DEMO_USERS[d['created_by']]['name']} · table: `{d['table_name']}` · "
+            f"{d['agg_func']}({d['agg_column'] or ''}) grouped by "
+            f"{', '.join(d['group_by']) or '(none — overall total)'}"
+        )
+        st.caption("Recomputed live, just now — not a cached or stored result.")
+        st.dataframe(result["result_display"], use_container_width=True)
+
+        dash_shared_with = get_dashboard_shared_with(selected_dashboard_id)
+        other_users_d = [u for u in list(DEMO_USERS.keys()) if u != current_user_id]
+        default_dash_shares = [u for u in dash_shared_with if u in other_users_d]
+        dash_share_targets = st.multiselect(
+            "Share this dashboard with:",
+            options=other_users_d,
+            default=default_dash_shares,
+            format_func=lambda uid: f"{DEMO_USERS[uid]['name']} ({DEMO_USERS[uid]['role']})",
+            key=f"dashshare_{selected_dashboard_id}_{current_user_id}",
+        )
+        dash_target_set = set(dash_share_targets)
+        dash_shared_set = set(dash_shared_with)
+        for uid in dash_target_set - dash_shared_set:
+            share_dashboard(selected_dashboard_id, uid)
+        for uid in dash_shared_set - dash_target_set:
+            if uid != current_user_id:
+                revoke_dashboard_share(selected_dashboard_id, uid)
+
+elif st.session_state.active_tool == "pipeline_lookup":
     st.title("🔧 Pipeline Lookup")
     st.caption(
         "A second, independent tool — built on the exact same `retrieve()` "
@@ -315,6 +430,13 @@ else:
 
     other_users = [u for u in list(DEMO_USERS.keys()) if u != current_user_id]
     default_shares = [u for u in shared_with if u in other_users]
+    # Keyed by (thread, viewer) -- NOT just the thread. Switching "You are:"
+    # stays in the same browser session, so a key scoped to the thread
+    # alone would let one viewer's stored selection get silently reused
+    # (and reset, since the options list excludes whoever's currently
+    # viewing) by the next simulated person, misreading their filtered
+    # leftover state as an intentional revoke. This is what caused Jamie
+    # to get revoked simply from Priya opening the share box.
     share_targets = st.multiselect(
         "Share this chat with:",
         options=other_users,
@@ -323,6 +445,11 @@ else:
         key=f"share_{selected_thread_id}_{current_user_id}",
     )
 
+    # Sync BOTH directions against the widget's current value: add anyone
+    # newly checked, revoke anyone newly unchecked. `current_user_id` is
+    # never in `other_users`, so it can never appear in either diff below --
+    # this is what stops the revoke branch from deleting the current
+    # viewer's own access on every rerun (see revoke_share's docstring).
     target_set = set(share_targets)
     shared_set = set(shared_with)
     for uid in target_set - shared_set:
@@ -362,19 +489,9 @@ else:
             st.caption(f"{badge} · topic tag: `{result['topic_tag']}`")
             if result.get("query_rewritten") and result.get("search_question"):
                 st.caption(f"🔎 Searched as: \"{result['search_question']}\"")
-
-            # meta stored on a thread message is JSON-serialized (see
-            # threads.py append_message), so DataFrames can't go in
-            # directly -- converted to plain records here, once, at the
-            # boundary where persistence happens.
-            aggregations_display = {
-                t: {"records": agg["df"].to_dict(orient="records"), "spec": agg["spec"]}
-                for t, agg in result["retrieval"].get("aggregations", {}).items()
-            }
             retrieval_for_display = {
                 "vector_hits": result["retrieval"]["vector_hits"],
                 "sql_results": {k: True for k in result["retrieval"]["sql_results"]},
-                "aggregations": aggregations_display,
                 "blocked_tables": result["retrieval"]["blocked_tables"],
             }
             _render_sources(retrieval_for_display)
