@@ -13,11 +13,21 @@ access_tier to the whole table (in metadata.csv) rather than per-row.
 Returns BOTH a prose-ready context string (for an LLM to answer from) and
 the raw hits/rows (for a future caller like the dashboard builder that
 needs structured data, not prose) from the same call.
+
+AGGREGATION: when a question needs a sum/average/count over a routed SQL
+table, that's computed for real with pandas (src/aggregation.py) and
+injected into the context as an explicitly labeled, authoritative block --
+the LLM is instructed (see chat.py's system prompt) to copy those numbers
+rather than re-derive its own from the raw table. This replaces the old
+behavior of handing the LLM a raw table and trusting it to sum correctly
+in prose, which works by luck at small row counts and degrades silently as
+tables grow.
 """
 from src.governance import get_allowed_tiers
 from src.gemini_client import embed_texts
 from src.vectorstore import search as vector_search
 from src.sql_store import query
+from src.aggregation import detect_aggregation_intent, compute_aggregation, format_for_display
 
 # Simple keyword router for SQL tables. Good enough for a prototype's scope
 # (per the design doc: "simple keyword routing is fine for now"). A real
@@ -78,6 +88,7 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
         "context_text": str,       # prose-ready, for the chat assistant
         "vector_hits": [ { text, title, owner, access_tier, last_verified, distance }, ... ],
         "sql_results": { table_name: DataFrame, ... },
+        "aggregations": { table_name: { "df": DataFrame, "spec": dict }, ... },
         "blocked_tables": [ table_name, ... ],  # relevant but role lacks access
         "allowed_tiers": [ ... ],
         "tiers_touched": { ... },  # union of tiers actually used in this answer
@@ -115,6 +126,21 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
         else:
             blocked_tables.append(table_name)
 
+    # --- Aggregation: real pandas math, only over tables we were already
+    # allowed to fetch -- an access-blocked table is never aggregated,
+    # since it was never even queried above. ---
+    aggregations = {}
+    for table_name, df in sql_results.items():
+        spec = detect_aggregation_intent(question, table_name)
+        if spec:
+            try:
+                agg_df = compute_aggregation(df, spec)
+                aggregations[table_name] = {"df": agg_df, "spec": spec}
+            except Exception:
+                # A malformed aggregation should degrade to "just show the
+                # raw table," never crash the whole retrieval call.
+                pass
+
     # --- Assemble prose context, citing owner + freshness for everything ---
     context_parts = []
     for hit in vector_hits:
@@ -128,6 +154,14 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
             f"[Source: {table_name} data \u2014 access tier: {table_meta_tier}]\n"
             f"{_df_to_markdown(df)}"
         )
+        if table_name in aggregations:
+            agg_df_display = format_for_display(aggregations[table_name]["df"])
+            context_parts.append(
+                f"[Pre-computed aggregation for {table_name} \u2014 calculated in code "
+                f"with pandas, NOT by you. These numbers are already correct. Present "
+                f"them as-is; do not recompute, re-derive, or re-sum anything from the "
+                f"raw table above.]\n{_df_to_markdown(agg_df_display)}"
+            )
     if blocked_tables:
         context_parts.append(
             f"[Note: {', '.join(blocked_tables)} data looked relevant to this "
@@ -145,6 +179,7 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
         "context_text": context_text,
         "vector_hits": vector_hits,
         "sql_results": sql_results,
+        "aggregations": aggregations,
         "blocked_tables": blocked_tables,
         "allowed_tiers": sorted(allowed_tiers),
         "tiers_touched": tiers_touched,
