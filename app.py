@@ -138,7 +138,7 @@ if ingestion_ok:
 
         with st.chat_message("assistant"):
             with st.spinner("Retrieving and generating..."):
-                result = get_answer(user_question, chat_role)
+                result = get_answer(user_question, chat_role, history=st.session_state.chat_history[:-1])
             st.markdown(result["answer"])
             badge = "🔴 declined — no KB coverage" if result["declined"] else f"🟢 confidence ~{result['confidence']:.2f}"
             st.caption(f"{badge} · topic tag: `{result['topic_tag']}` · asked as: {chat_role}")
