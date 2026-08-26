@@ -5,7 +5,7 @@ from src.governance import get_allowed_tiers, get_stale_documents, detect_gaps, 
 from src.retrieval import retrieve
 from src.chat import get_answer
 from src.threads import (
-    DEMO_USERS, create_thread, share_thread, get_shared_with,
+    DEMO_USERS, create_thread, share_thread, revoke_share, get_shared_with,
     get_thread, get_messages, append_message, list_visible_threads,
     create_project, list_projects_for_user,
 )
@@ -31,7 +31,6 @@ def _render_sources(retrieval: dict):
             st.write("Nothing retrieved for this question.")
 
 
-# --- Ingestion runs once, cached, regardless of which UI section is open ---
 @st.cache_resource(show_spinner="Running ingestion — chunking docs, summarizing the call transcript, embedding, loading SQL tables...")
 def get_ingestion_report():
     return run_ingestion()
@@ -45,8 +44,6 @@ except Exception as e:
     ingestion_error = e
     ingestion_ok = False
 
-# --- Diagnostics: tucked away, collapsed by default. Same content as
-# before, just no longer the first thing you see when the app opens. ---
 with st.expander("⚙️ System status — ingestion, governance, retrieval diagnostics", expanded=False):
     st.subheader("Layer 1 + 2 — Source & Structure/Store")
     if ingestion_ok:
@@ -143,7 +140,6 @@ with st.expander("⚙️ System status — ingestion, governance, retrieval diag
 if not ingestion_ok:
     st.stop()
 
-# --- Sidebar: Claude-style navigation -- user switcher, Projects, Chats ---
 if "selected_thread_id" not in st.session_state:
     st.session_state.selected_thread_id = None
 
@@ -231,7 +227,6 @@ with st.sidebar:
         else:
             st.warning("Give the project a name first.")
 
-# --- Main area: selected chat, or an empty state ------------------------
 selected_thread_id = st.session_state.selected_thread_id
 
 if selected_thread_id is None:
@@ -268,9 +263,19 @@ else:
         format_func=lambda uid: f"{DEMO_USERS[uid]['name']} ({DEMO_USERS[uid]['role']})",
         key=f"share_{selected_thread_id}",
     )
-    for uid in share_targets:
-        if uid not in shared_with:
-            share_thread(selected_thread_id, uid)
+
+    # Sync BOTH directions against the widget's current value: add anyone
+    # newly checked, revoke anyone newly unchecked. `current_user_id` is
+    # never in `other_users`, so it can never appear in either diff below --
+    # this is what stops the revoke branch from deleting the current
+    # viewer's own access on every rerun (see revoke_share's docstring).
+    target_set = set(share_targets)
+    shared_set = set(shared_with)
+    for uid in target_set - shared_set:
+        share_thread(selected_thread_id, uid)
+    for uid in shared_set - target_set:
+        if uid != current_user_id:
+            revoke_share(selected_thread_id, uid)
 
     for msg in get_messages(selected_thread_id, current_user_id):
         with st.chat_message(msg["role"]):
