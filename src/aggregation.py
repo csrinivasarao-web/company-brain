@@ -22,11 +22,9 @@ called out in retrieval.py's SQL_TABLE_KEYWORDS. It only ever recognizes
 real column names/synonyms for the specific table already routed by
 retrieval.py; it does not guess at columns that don't exist.
 """
+import re
 import pandas as pd
 
-# Which columns can be grouped by / aggregated, per table -- and the
-# phrasing that should trigger recognizing them in a question. Synonyms
-# map to a REAL column name in that table; nothing here is invented.
 TABLE_AGG_CONFIG = {
     "pipeline": {
         "numeric_column": "amount_usd",
@@ -63,22 +61,24 @@ def _detect_agg_func(q: str):
 
 
 def _detect_group_by(q: str, groupable_synonyms: dict) -> list:
-    """Returns real column names, in the order their synonyms were
-    mentioned in the question. Longest synonyms are checked first so e.g.
-    "account name" matches before the shorter "account" would."""
+    """Word-boundary matching, NOT plain substring containment -- a naive
+    `"payer" in question` matches inside "payers", which was causing "how
+    many payers by integration status" to spuriously group by individual
+    payer name on top of the actually-requested integration_status
+    grouping, since "payers" contains "payer" as a substring. \\b anchors
+    this to whole words only."""
     found = []
     for synonym in sorted(groupable_synonyms, key=len, reverse=True):
         col = groupable_synonyms[synonym]
-        if synonym in q and col not in [c for _, c in found]:
-            found.append((q.find(synonym), col))
+        pattern = r"\b" + re.escape(synonym) + r"\b"
+        match = re.search(pattern, q)
+        if match and col not in [c for _, c in found]:
+            found.append((match.start(), col))
     found.sort(key=lambda x: x[0])
-    return [col for _, col in found][:2]  # cap at 2 dimensions
+    return [col for _, col in found][:2]
 
 
 def detect_aggregation_intent(question: str, table_name: str):
-    """Returns an aggregation spec dict, or None if the question doesn't
-    carry any aggregation signal for this table (in which case the raw
-    table alone is the right answer, same as before this change)."""
     config = TABLE_AGG_CONFIG.get(table_name)
     if not config:
         return None
@@ -88,19 +88,12 @@ def detect_aggregation_intent(question: str, table_name: str):
     if not agg_func and not group_by:
         return None
     if not agg_func:
-        # Grouping was mentioned with no explicit verb ("by segment and
-        # stage") -- sum is the overwhelmingly common intent for a
-        # numeric business table, so it's the sane default rather than
-        # returning nothing.
         agg_func = "sum"
     numeric_col = None if agg_func == "count" else config["numeric_column"]
     return {"agg_func": agg_func, "group_by": group_by, "numeric_col": numeric_col, "table": table_name}
 
 
 def compute_aggregation(df: pd.DataFrame, spec: dict) -> pd.DataFrame:
-    """The actual math. Real pandas groupby/agg -- deterministic, correct
-    regardless of row count. This is the function both chat's
-    auto-detection and a saved dashboard's recipe call."""
     group_by = spec["group_by"]
     agg_func = spec["agg_func"]
     numeric_col = spec["numeric_col"]
@@ -116,10 +109,6 @@ def compute_aggregation(df: pd.DataFrame, spec: dict) -> pd.DataFrame:
 
 
 def format_for_display(df: pd.DataFrame) -> pd.DataFrame:
-    """Adds thousands separators to numeric columns for readability in the
-    markdown context block and the UI -- purely cosmetic, applied only at
-    display time. The raw (unformatted) DataFrame is what's actually
-    returned for programmatic reuse."""
     formatted = df.copy()
     for col in formatted.select_dtypes(include="number").columns:
         formatted[col] = formatted[col].apply(
