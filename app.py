@@ -4,6 +4,10 @@ from src.sql_store import query
 from src.governance import get_allowed_tiers, get_stale_documents, detect_gaps, ROLE_ACCESS
 from src.retrieval import retrieve
 from src.chat import get_answer
+from src.threads import (
+    DEMO_USERS, create_thread, share_thread, get_shared_with,
+    get_thread, get_messages, append_message, list_visible_threads,
+)
 
 st.set_page_config(page_title="Needletail Company Brain", page_icon="🧠", layout="centered")
 
@@ -86,96 +90,138 @@ if ingestion_ok:
         for role, tiers in ROLE_ACCESS.items():
             st.write(f"**{role}**: {', '.join(sorted(tiers))}")
         st.caption(
-            "This is re-checked on every query, dashboard view, and thread open — "
+            "This is re-checked on every query, thread view, and message — "
             "never cached per document, so access always reflects the current viewer."
         )
 else:
     st.info("Governance checks run once ingestion succeeds.")
 
+
+def _render_sources(retrieval: dict):
+    with st.expander("Sources used for this answer"):
+        if retrieval.get("vector_hits"):
+            st.write("**Knowledge base documents:**")
+            for hit in retrieval["vector_hits"]:
+                st.markdown(f"- {hit['title']} — owner: {hit['owner']}, last verified: {hit['last_verified']}")
+        if retrieval.get("sql_results"):
+            st.write("**Structured data:**")
+            for t in retrieval["sql_results"]:
+                st.markdown(f"- `{t}` table")
+        if retrieval.get("blocked_tables"):
+            st.write("**Blocked by access tier:**")
+            for t in retrieval["blocked_tables"]:
+                st.markdown(f"- `{t}` (not visible at this thread's current access level)")
+        if not retrieval.get("vector_hits") and not retrieval.get("sql_results"):
+            st.write("Nothing retrieved for this question.")
+
+
 st.divider()
-st.subheader("💬 Chat with the Company Brain")
+st.subheader("💬 Company Brain — Threads")
 st.caption(
-    "Answers only from the retrieved knowledge base — cited, freshness-dated, "
-    "and honest when it doesn't know something. Every question here also feeds "
-    "gap detection above."
+    "Persistent, shareable conversations — answers only from the retrieved "
+    "knowledge base, cited and freshness-dated. A thread is visible only to "
+    "people whose access covers everything ever pulled into it, checked "
+    "fresh for whoever is currently viewing — not just whoever created it."
 )
 
 if ingestion_ok:
-    if "chat_history" not in st.session_state:
-        st.session_state.chat_history = []
+    user_ids = list(DEMO_USERS.keys())
+    current_user_id = st.selectbox(
+        "You are:",
+        user_ids,
+        format_func=lambda uid: f"{DEMO_USERS[uid]['name']} ({DEMO_USERS[uid]['role']})",
+        key="current_user_id",
+    )
+    current_role = DEMO_USERS[current_user_id]["role"]
 
-    chat_role = st.selectbox("Chatting as:", list(ROLE_ACCESS.keys()), key="chat_role")
+    visible_threads = list_visible_threads(current_user_id)
+    thread_options = {t["thread_id"]: t["title"] for t in visible_threads}
+    thread_options[None] = "+ New thread"
 
-    for msg in st.session_state.chat_history:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-            if msg["role"] == "assistant" and msg.get("meta"):
-                meta = msg["meta"]
-                badge = "🔴 declined — no KB coverage" if meta["declined"] else f"🟢 confidence ~{meta['confidence']:.2f}"
-                st.caption(f"{badge} · topic tag: `{meta['topic_tag']}` · asked as: {meta['role']}")
-                with st.expander("Sources used for this answer"):
-                    if meta["retrieval"]["vector_hits"]:
-                        st.write("**Knowledge base documents:**")
-                        for hit in meta["retrieval"]["vector_hits"]:
-                            st.markdown(f"- {hit['title']} — owner: {hit['owner']}, last verified: {hit['last_verified']}")
-                    if meta["retrieval"]["sql_results"]:
-                        st.write("**Structured data:**")
-                        for t in meta["retrieval"]["sql_results"]:
-                            st.markdown(f"- `{t}` table")
-                    if meta["retrieval"]["blocked_tables"]:
-                        st.write("**Blocked by access tier:**")
-                        for t in meta["retrieval"]["blocked_tables"]:
-                            st.markdown(f"- `{t}` (not visible to {meta['role']})")
-                    if not meta["retrieval"]["vector_hits"] and not meta["retrieval"]["sql_results"]:
-                        st.write("Nothing retrieved for this question.")
+    selected_thread_id = st.selectbox(
+        "Thread:",
+        options=list(thread_options.keys()),
+        format_func=lambda tid: thread_options[tid],
+        key="selected_thread_id",
+    )
 
-    user_question = st.chat_input("Ask the Company Brain something...")
+    if selected_thread_id is None:
+        new_title = st.text_input("New thread title:", placeholder="e.g. Meridian renewal questions", key="new_thread_title")
+        if st.button("Create thread"):
+            if new_title.strip():
+                new_id = create_thread(new_title.strip(), current_user_id)
+                st.session_state.selected_thread_id = new_id
+                st.rerun()
+            else:
+                st.warning("Give the thread a title first.")
+    else:
+        thread = get_thread(selected_thread_id)
+        shared_with = get_shared_with(selected_thread_id)
 
-    if user_question:
-        st.session_state.chat_history.append({"role": "user", "content": user_question})
-        with st.chat_message("user"):
-            st.markdown(user_question)
+        st.markdown(f"**{thread['title']}** — created by {DEMO_USERS[thread['created_by']]['name']}")
+        if thread["required_tiers"]:
+            st.caption(
+                f"This thread has touched: {', '.join(thread['required_tiers'])} — "
+                f"only people cleared for ALL of these tiers can open it."
+            )
 
-        with st.chat_message("assistant"):
-            with st.spinner("Retrieving and generating..."):
-                result = get_answer(user_question, chat_role, history=st.session_state.chat_history[:-1])
-            st.markdown(result["answer"])
-            badge = "🔴 declined — no KB coverage" if result["declined"] else f"🟢 confidence ~{result['confidence']:.2f}"
-            st.caption(f"{badge} · topic tag: `{result['topic_tag']}` · asked as: {chat_role}")
-            with st.expander("Sources used for this answer"):
-                if result["retrieval"]["vector_hits"]:
-                    st.write("**Knowledge base documents:**")
-                    for hit in result["retrieval"]["vector_hits"]:
-                        st.markdown(f"- {hit['title']} — owner: {hit['owner']}, last verified: {hit['last_verified']}")
-                if result["retrieval"]["sql_results"]:
-                    st.write("**Structured data:**")
-                    for t in result["retrieval"]["sql_results"]:
-                        st.markdown(f"- `{t}` table")
-                if result["retrieval"]["blocked_tables"]:
-                    st.write("**Blocked by access tier:**")
-                    for t in result["retrieval"]["blocked_tables"]:
-                        st.markdown(f"- `{t}` (not visible to {chat_role})")
-                if not result["retrieval"]["vector_hits"] and not result["retrieval"]["sql_results"]:
-                    st.write("Nothing retrieved for this question.")
+        other_users = [u for u in user_ids if u != current_user_id]
+        default_shares = [u for u in shared_with if u in other_users]
+        share_targets = st.multiselect(
+            "Share this thread with:",
+            options=other_users,
+            default=default_shares,
+            format_func=lambda uid: f"{DEMO_USERS[uid]['name']} ({DEMO_USERS[uid]['role']})",
+            key=f"share_{selected_thread_id}",
+        )
+        for uid in share_targets:
+            if uid not in shared_with:
+                share_thread(selected_thread_id, uid)
 
-        st.session_state.chat_history.append({
-            "role": "assistant",
-            "content": result["answer"],
-            "meta": {
-                "declined": result["declined"],
-                "confidence": result["confidence"],
-                "topic_tag": result["topic_tag"],
-                "retrieval": result["retrieval"],
-                "role": chat_role,
-            },
-        })
+        for msg in get_messages(selected_thread_id):
+            with st.chat_message(msg["role"]):
+                st.markdown(msg["content"])
+                meta = msg.get("meta") or {}
+                if msg["role"] == "assistant" and meta:
+                    badge = "🔴 declined — no KB coverage" if meta.get("declined") else f"🟢 confidence ~{meta.get('confidence', 0):.2f}"
+                    st.caption(f"{badge} · topic tag: `{meta.get('topic_tag')}`")
+                    _render_sources(meta.get("retrieval", {}))
 
-    if st.session_state.chat_history:
-        if st.button("Clear chat"):
-            st.session_state.chat_history = []
+        user_question = st.chat_input("Ask something in this thread...", key=f"input_{selected_thread_id}")
+
+        if user_question:
+            append_message(selected_thread_id, "user", user_question)
+            with st.chat_message("user"):
+                st.markdown(user_question)
+
+            history_for_prompt = get_messages(selected_thread_id)[:-1]
+
+            with st.chat_message("assistant"):
+                with st.spinner("Retrieving and generating..."):
+                    result = get_answer(user_question, current_role, history=history_for_prompt)
+                st.markdown(result["answer"])
+                badge = "🔴 declined — no KB coverage" if result["declined"] else f"🟢 confidence ~{result['confidence']:.2f}"
+                st.caption(f"{badge} · topic tag: `{result['topic_tag']}`")
+                retrieval_for_display = {
+                    "vector_hits": result["retrieval"]["vector_hits"],
+                    "sql_results": {k: True for k in result["retrieval"]["sql_results"]},
+                    "blocked_tables": result["retrieval"]["blocked_tables"],
+                }
+                _render_sources(retrieval_for_display)
+
+            append_message(
+                selected_thread_id, "assistant", result["answer"],
+                meta={
+                    "declined": result["declined"],
+                    "confidence": result["confidence"],
+                    "topic_tag": result["topic_tag"],
+                    "retrieval": retrieval_for_display,
+                },
+                touched_tiers=result["retrieval"]["tiers_touched"],
+            )
             st.rerun()
 else:
-    st.info("Chat runs once ingestion succeeds.")
+    st.info("Threads run once ingestion succeeds.")
 
 st.divider()
 with st.expander("Layer 4 raw test harness (for debugging retrieval directly, without the chat layer)"):
@@ -215,7 +261,7 @@ layers = [
     ("Layer 3 — Governance (approval, RBAC, freshness, gap detection)", ingestion_ok),
     ("Layer 4 — Query (scoped retrieval)", ingestion_ok),
     ("Layer 5 — Act: Chat assistant", ingestion_ok),
-    ("Layer 5 — Act: Threads/projects", False),
+    ("Layer 5 — Act: Threads/projects", ingestion_ok),
     ("Layer 5 — Act: Build API demo", False),
     ("Layer 5 — Act: No-code dashboard builder", False),
     ("Layer 5 — Act: Proactive digest", False),
