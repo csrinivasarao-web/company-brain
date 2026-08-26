@@ -69,6 +69,29 @@ Rules, in order of importance:
    earlier in the conversation.
 """
 
+# --- Query rewriting for retrieval (NOT the same thing as answer memory) ---
+# The fix added earlier only gave the ANSWERING step conversation memory --
+# retrieval itself still searched on the raw text of a follow-up like
+# "Explain more", which carries no topical signal on its own and returns
+# whatever happens to be nearby in embedding space. This step resolves a
+# follow-up into a standalone question BEFORE it's embedded, so retrieval
+# actually searches for what's being asked, not the literal follow-up
+# phrasing. One extra small LLM call per turn with history -- skipped
+# entirely when there's no history yet, to avoid the cost on a first turn.
+REWRITE_SYSTEM_PROMPT = """Rewrite the person's LATEST message into a fully
+self-contained question or request, using ONLY the recent conversation to
+resolve references (pronouns, "it", "them", "explain more", "what about
+that", etc.).
+
+Rules:
+- Output ONLY the rewritten question/request. No preamble, no quotes, no
+  explanation of what you did.
+- If the latest message is already self-contained and doesn't depend on
+  prior context, output it unchanged.
+- Do not answer the question. Do not add information or specifics that
+  aren't implied by the conversation itself.
+"""
+
 # --- Confidence scoring --------------------------------------------------
 # Chroma's distance metric here is L2 over Gemini's embedding vectors.
 # There's no ground-truth "confidence" without a labeled eval set, so this
@@ -161,6 +184,21 @@ def _format_history(history: list, max_turns: int = 3) -> str:
     return "\n".join(lines)
 
 
+def _rewrite_query_with_history(question: str, history_text: str) -> str:
+    """Resolves a follow-up like "Explain more" into a standalone question
+    BEFORE retrieval runs. Falls back to the raw question on any failure --
+    a broken rewrite should degrade to the old (imperfect) behavior, never
+    crash the whole turn."""
+    if not history_text:
+        return question
+    prompt = f"Recent conversation:\n{history_text}\n\nLatest message: {question}\n\nRewritten standalone version:"
+    try:
+        rewritten = generate_text(prompt, system_instruction=REWRITE_SYSTEM_PROMPT).strip()
+        return rewritten if rewritten else question
+    except Exception:
+        return question
+
+
 def get_answer(question: str, role: str, history: list = None) -> dict:
     """Returns:
       {
@@ -168,7 +206,9 @@ def get_answer(question: str, role: str, history: list = None) -> dict:
         "retrieval": dict,     # the full Layer 4 result, for citation/debug display
         "confidence": float,
         "topic_tag": str,
-        "declined": bool,      # True if the LLM was skipped (nothing retrieved)
+        "declined": bool,       # True if the LLM was skipped (nothing retrieved)
+        "search_question": str, # what was actually searched for (may differ from `question`)
+        "query_rewritten": bool,
       }
 
     `history` should be the CURRENT tab's session_state.chat_history with
@@ -176,9 +216,13 @@ def get_answer(question: str, role: str, history: list = None) -> dict:
     Lives only in this browser tab's memory -- see module docstring for why
     this is intentionally smaller than Threads/projects.
     """
-    retrieval_result = retrieve(question, role)
+    history_text = _format_history(history)
+    search_question = _rewrite_query_with_history(question, history_text)
+    query_rewritten = search_question != question
+
+    retrieval_result = retrieve(search_question, role)
     confidence = _score_confidence(retrieval_result)
-    topic_tag = _tag_topic(question)
+    topic_tag = _tag_topic(search_question)
 
     if not retrieval_result["context_text"]:
         answer = (
@@ -189,7 +233,6 @@ def get_answer(question: str, role: str, history: list = None) -> dict:
         )
         declined = True
     else:
-        history_text = _format_history(history)
         history_block = (
             f"Recent conversation so far (for understanding what this question "
             f"refers to only -- NOT a source of facts):\n{history_text}\n\n"
@@ -198,7 +241,7 @@ def get_answer(question: str, role: str, history: list = None) -> dict:
         user_prompt = (
             f"{history_block}"
             f"Context:\n{retrieval_result['context_text']}\n\n"
-            f"Question: {question}"
+            f"Question: {search_question}"
         )
         answer = generate_text(user_prompt, system_instruction=SYSTEM_PROMPT)
         declined = False
@@ -215,4 +258,6 @@ def get_answer(question: str, role: str, history: list = None) -> dict:
         "confidence": confidence,
         "topic_tag": topic_tag,
         "declined": declined,
+        "search_question": search_question,
+        "query_rewritten": query_rewritten,
     }
