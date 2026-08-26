@@ -126,10 +126,9 @@ st.caption(
 
 if ingestion_ok:
     # Streamlit won't let us reassign a widget's session_state value after
-    # that widget has already been drawn in this same run (the bug that
-    # just crashed) -- so instead, stash the newly created thread id under
-    # a different key, and apply it here, BEFORE the selectbox below is
-    # created on the next rerun.
+    # that widget has already been drawn in this same run -- so instead,
+    # stash the newly created thread id under a different key, and apply
+    # it here, BEFORE the selectbox below is created on the next rerun.
     if "pending_thread_id" in st.session_state:
         st.session_state["selected_thread_id"] = st.session_state.pop("pending_thread_id")
 
@@ -163,7 +162,16 @@ if ingestion_ok:
             else:
                 st.warning("Give the thread a title first.")
     else:
-        thread = get_thread(selected_thread_id)
+        # get_thread() now enforces access internally (see threads.py) --
+        # this reaches None only if the required tiers changed since this
+        # thread was last listed (e.g. someone else just pulled a higher-
+        # tier source into it mid-session). Guard rather than assume the
+        # dropdown listing is still valid by the time this line runs.
+        thread = get_thread(selected_thread_id, current_user_id)
+        if thread is None:
+            st.warning("This thread is no longer accessible with your current access level. Pick another thread.")
+            st.stop()
+
         shared_with = get_shared_with(selected_thread_id)
 
         st.markdown(f"**{thread['title']}** — created by {DEMO_USERS[thread['created_by']]['name']}")
@@ -186,7 +194,7 @@ if ingestion_ok:
             if uid not in shared_with:
                 share_thread(selected_thread_id, uid)
 
-        for msg in get_messages(selected_thread_id):
+        for msg in get_messages(selected_thread_id, current_user_id):
             with st.chat_message(msg["role"]):
                 st.markdown(msg["content"])
                 meta = msg.get("meta") or {}
@@ -204,7 +212,7 @@ if ingestion_ok:
             with st.chat_message("user"):
                 st.markdown(user_question)
 
-            history_for_prompt = get_messages(selected_thread_id)[:-1]
+            history_for_prompt = get_messages(selected_thread_id, current_user_id)[:-1]
 
             with st.chat_message("assistant"):
                 with st.spinner("Retrieving and generating..."):
