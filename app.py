@@ -256,12 +256,19 @@ else:
 
     other_users = [u for u in list(DEMO_USERS.keys()) if u != current_user_id]
     default_shares = [u for u in shared_with if u in other_users]
+    # Keyed by (thread, viewer) -- NOT just the thread. Switching "You are:"
+    # stays in the same browser session, so a key scoped to the thread
+    # alone would let one viewer's stored selection get silently reused
+    # (and reset, since the options list excludes whoever's currently
+    # viewing) by the next simulated person, misreading their filtered
+    # leftover state as an intentional revoke. This is what caused Jamie
+    # to get revoked simply from Priya opening the share box.
     share_targets = st.multiselect(
         "Share this chat with:",
         options=other_users,
         default=default_shares,
         format_func=lambda uid: f"{DEMO_USERS[uid]['name']} ({DEMO_USERS[uid]['role']})",
-        key=f"share_{selected_thread_id}",
+        key=f"share_{selected_thread_id}_{current_user_id}",
     )
 
     # Sync BOTH directions against the widget's current value: add anyone
