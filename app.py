@@ -1,3 +1,4 @@
+import pandas as pd
 import streamlit as st
 from src.ingest import run_ingestion
 from src.sql_store import query
@@ -23,6 +24,11 @@ def _render_sources(retrieval: dict):
             st.write("**Structured data:**")
             for t in retrieval["sql_results"]:
                 st.markdown(f"- `{t}` table")
+        if retrieval.get("aggregations"):
+            st.write("**Computed aggregation (calculated in code with pandas, not by the model):**")
+            for t, agg in retrieval["aggregations"].items():
+                st.caption(f"`{t}` — {agg['spec'].get('agg_func')} grouped by {agg['spec'].get('group_by') or '(none — overall total)'}")
+                st.dataframe(pd.DataFrame(agg["records"]), use_container_width=True)
         if retrieval.get("blocked_tables"):
             st.write("**Blocked by access tier:**")
             for t in retrieval["blocked_tables"]:
@@ -100,7 +106,7 @@ with st.expander("⚙️ System status — ingestion, governance, retrieval diag
     st.subheader("Layer 4 raw test harness (debug retrieval directly, without the chat layer)")
     if ingestion_ok:
         test_role = st.selectbox("Test as role:", list(ROLE_ACCESS.keys()), key="l4_role")
-        test_question = st.text_input("Test question:", "What's our pipeline for enterprise DSOs?", key="l4_question")
+        test_question = st.text_input("Test question:", "Aggregate the amount by segment and stage", key="l4_question")
         if st.button("Run retrieval", key="l4_run"):
             try:
                 result = retrieve(test_question, test_role)
@@ -114,6 +120,13 @@ with st.expander("⚙️ System status — ingestion, governance, retrieval diag
                     for t, df in result["sql_results"].items():
                         st.write(t)
                         st.dataframe(df)
+                with st.expander("Raw aggregations (computed with pandas)"):
+                    if result["aggregations"]:
+                        for t, agg in result["aggregations"].items():
+                            st.write(f"`{t}` — spec: {agg['spec']}")
+                            st.dataframe(agg["df"])
+                    else:
+                        st.write("No aggregation triggered for this question.")
             except Exception as e:
                 st.error(f"Retrieval failed: {e}")
     else:
@@ -126,8 +139,8 @@ with st.expander("⚙️ System status — ingestion, governance, retrieval diag
         ("Layer 1 — Source (mock data set)", True),
         ("Layer 2 — Structure & store (Vector DB + SQL + metadata)", ingestion_ok),
         ("Layer 3 — Governance (approval, RBAC, freshness, gap detection)", ingestion_ok),
-        ("Layer 4 — Query (scoped retrieval)", ingestion_ok),
-        ("Layer 5 — Act: Chat assistant", ingestion_ok),
+        ("Layer 4 — Query (scoped retrieval + real aggregation)", ingestion_ok),
+        ("Layer 5 — Act: Chat assistant (accurate aggregation)", ingestion_ok),
         ("Layer 5 — Act: Threads/projects (message-level access)", ingestion_ok),
         ("Layer 5 — Act: Build API demo", ingestion_ok),
         ("Layer 5 — Act: No-code dashboard builder", False),
@@ -302,13 +315,6 @@ else:
 
     other_users = [u for u in list(DEMO_USERS.keys()) if u != current_user_id]
     default_shares = [u for u in shared_with if u in other_users]
-    # Keyed by (thread, viewer) -- NOT just the thread. Switching "You are:"
-    # stays in the same browser session, so a key scoped to the thread
-    # alone would let one viewer's stored selection get silently reused
-    # (and reset, since the options list excludes whoever's currently
-    # viewing) by the next simulated person, misreading their filtered
-    # leftover state as an intentional revoke. This is what caused Jamie
-    # to get revoked simply from Priya opening the share box.
     share_targets = st.multiselect(
         "Share this chat with:",
         options=other_users,
@@ -317,11 +323,6 @@ else:
         key=f"share_{selected_thread_id}_{current_user_id}",
     )
 
-    # Sync BOTH directions against the widget's current value: add anyone
-    # newly checked, revoke anyone newly unchecked. `current_user_id` is
-    # never in `other_users`, so it can never appear in either diff below --
-    # this is what stops the revoke branch from deleting the current
-    # viewer's own access on every rerun (see revoke_share's docstring).
     target_set = set(share_targets)
     shared_set = set(shared_with)
     for uid in target_set - shared_set:
@@ -361,9 +362,19 @@ else:
             st.caption(f"{badge} · topic tag: `{result['topic_tag']}`")
             if result.get("query_rewritten") and result.get("search_question"):
                 st.caption(f"🔎 Searched as: \"{result['search_question']}\"")
+
+            # meta stored on a thread message is JSON-serialized (see
+            # threads.py append_message), so DataFrames can't go in
+            # directly -- converted to plain records here, once, at the
+            # boundary where persistence happens.
+            aggregations_display = {
+                t: {"records": agg["df"].to_dict(orient="records"), "spec": agg["spec"]}
+                for t, agg in result["retrieval"].get("aggregations", {}).items()
+            }
             retrieval_for_display = {
                 "vector_hits": result["retrieval"]["vector_hits"],
                 "sql_results": {k: True for k in result["retrieval"]["sql_results"]},
+                "aggregations": aggregations_display,
                 "blocked_tables": result["retrieval"]["blocked_tables"],
             }
             _render_sources(retrieval_for_display)
