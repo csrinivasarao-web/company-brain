@@ -125,6 +125,14 @@ st.caption(
 )
 
 if ingestion_ok:
+    # Streamlit won't let us reassign a widget's session_state value after
+    # that widget has already been drawn in this same run (the bug that
+    # just crashed) -- so instead, stash the newly created thread id under
+    # a different key, and apply it here, BEFORE the selectbox below is
+    # created on the next rerun.
+    if "pending_thread_id" in st.session_state:
+        st.session_state["selected_thread_id"] = st.session_state.pop("pending_thread_id")
+
     user_ids = list(DEMO_USERS.keys())
     current_user_id = st.selectbox(
         "You are:",
@@ -150,7 +158,7 @@ if ingestion_ok:
         if st.button("Create thread"):
             if new_title.strip():
                 new_id = create_thread(new_title.strip(), current_user_id)
-                st.session_state.selected_thread_id = new_id
+                st.session_state.pending_thread_id = new_id
                 st.rerun()
             else:
                 st.warning("Give the thread a title first.")
