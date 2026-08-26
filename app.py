@@ -193,6 +193,8 @@ if ingestion_ok:
                 if msg["role"] == "assistant" and meta:
                     badge = "🔴 declined — no KB coverage" if meta.get("declined") else f"🟢 confidence ~{meta.get('confidence', 0):.2f}"
                     st.caption(f"{badge} · topic tag: `{meta.get('topic_tag')}`")
+                    if meta.get("query_rewritten") and meta.get("search_question"):
+                        st.caption(f"🔎 Searched as: \"{meta['search_question']}\"")
                     _render_sources(meta.get("retrieval", {}))
 
         user_question = st.chat_input("Ask something in this thread...", key=f"input_{selected_thread_id}")
@@ -210,6 +212,8 @@ if ingestion_ok:
                 st.markdown(result["answer"])
                 badge = "🔴 declined — no KB coverage" if result["declined"] else f"🟢 confidence ~{result['confidence']:.2f}"
                 st.caption(f"{badge} · topic tag: `{result['topic_tag']}`")
+                if result.get("query_rewritten") and result.get("search_question"):
+                    st.caption(f"🔎 Searched as: \"{result['search_question']}\"")
                 retrieval_for_display = {
                     "vector_hits": result["retrieval"]["vector_hits"],
                     "sql_results": {k: True for k in result["retrieval"]["sql_results"]},
@@ -224,6 +228,8 @@ if ingestion_ok:
                     "confidence": result["confidence"],
                     "topic_tag": result["topic_tag"],
                     "retrieval": retrieval_for_display,
+                    "search_question": result.get("search_question"),
+                    "query_rewritten": result.get("query_rewritten"),
                 },
                 touched_tiers=result["retrieval"]["tiers_touched"],
             )
