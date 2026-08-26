@@ -11,6 +11,9 @@ Enforces, at the prompt-template level (not left to model discretion):
     if NOTHING at all came back (not even a blocked-access note), the LLM
     is skipped entirely in favor of a deterministic decline, rather than
     trusting it to decline correctly every single time
+  - if the context includes a pre-computed aggregation block (see
+    src/aggregation.py), those numbers were calculated in code and must be
+    used as-is, never re-derived from the raw table by the model itself
 
 Also logs every question to query_log (topic tag + an approximate
 confidence score) so Layer 3's gap detection has real, live data to work
@@ -67,6 +70,15 @@ Rules, in order of importance:
    source of facts. Every factual claim must still come only from the
    Context section for THIS turn, even if something relevant was stated
    earlier in the conversation.
+7. If the context includes a block explicitly labeled "Pre-computed
+   aggregation", those totals, averages, or counts were calculated in code
+   (pandas), not by you, and are correct. Present them exactly as given.
+   Do NOT perform your own arithmetic on the raw table to total, sum,
+   average, or count anything yourself, even if the raw table is also
+   shown alongside it -- your own arithmetic over a text table is exactly
+   the failure mode this block exists to prevent. If a question needs an
+   aggregate number and no such block is present, say the number isn't
+   available rather than computing it yourself.
 """
 
 # --- Query rewriting for retrieval (NOT the same thing as answer memory) ---
