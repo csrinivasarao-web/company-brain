@@ -129,7 +129,7 @@ with st.expander("⚙️ System status — ingestion, governance, retrieval diag
         ("Layer 4 — Query (scoped retrieval)", ingestion_ok),
         ("Layer 5 — Act: Chat assistant", ingestion_ok),
         ("Layer 5 — Act: Threads/projects (message-level access)", ingestion_ok),
-        ("Layer 5 — Act: Build API demo", False),
+        ("Layer 5 — Act: Build API demo", ingestion_ok),
         ("Layer 5 — Act: No-code dashboard builder", False),
         ("Layer 5 — Act: Proactive digest", False),
     ]
@@ -142,6 +142,8 @@ if not ingestion_ok:
 
 if "selected_thread_id" not in st.session_state:
     st.session_state.selected_thread_id = None
+if "active_tool" not in st.session_state:
+    st.session_state.active_tool = None
 
 with st.sidebar:
     st.markdown("### 🧠 Company Brain")
@@ -154,6 +156,15 @@ with st.sidebar:
         key="current_user_id",
     )
     current_role = DEMO_USERS[current_user_id]["role"]
+
+    st.divider()
+
+    st.markdown("**Tools**")
+    st.caption("Independent mini-tools built on Layer 4 — not the chat UI.")
+    if st.button("🔧 Pipeline Lookup", key="tool_pipeline_btn", use_container_width=True):
+        st.session_state.active_tool = "pipeline_lookup"
+        st.session_state.selected_thread_id = None
+        st.rerun()
 
     st.divider()
 
@@ -174,6 +185,7 @@ with st.sidebar:
         label = ("● " if active else "") + t["title"]
         if st.button(label, key=f"{key_prefix}_{t['thread_id']}", use_container_width=True):
             st.session_state.selected_thread_id = t["thread_id"]
+            st.session_state.active_tool = None
             st.rerun()
 
     if projects:
@@ -193,6 +205,7 @@ with st.sidebar:
                     if new_title.strip():
                         new_id = create_thread(new_title.strip(), current_user_id, project_id=proj["project_id"])
                         st.session_state.selected_thread_id = new_id
+                        st.session_state.active_tool = None
                         st.rerun()
                     else:
                         st.warning("Give the chat a title first.")
@@ -211,6 +224,7 @@ with st.sidebar:
         if new_chat_title.strip():
             new_id = create_thread(new_chat_title.strip(), current_user_id, project_id=None)
             st.session_state.selected_thread_id = new_id
+            st.session_state.active_tool = None
             st.rerun()
         else:
             st.warning("Give the chat a title first.")
@@ -229,7 +243,39 @@ with st.sidebar:
 
 selected_thread_id = st.session_state.selected_thread_id
 
-if selected_thread_id is None:
+if st.session_state.active_tool == "pipeline_lookup":
+    st.title("🔧 Pipeline Lookup")
+    st.caption(
+        "A second, independent tool — built on the exact same `retrieve()` "
+        "function the chat assistant uses (Layer 4). No new retrieval logic, "
+        "no new access rules written for this tool specifically: whatever "
+        "governance applies to your current role in chat applies here too, "
+        "automatically, because it's the same function underneath."
+    )
+
+    segment = st.selectbox("Segment:", ["enterprise", "mid_market", "smb"], key="tool_segment")
+
+    if st.button("Look up pipeline", key="tool_run"):
+        result = retrieve(f"pipeline deals in the {segment} segment", current_role)
+
+        if result["blocked_tables"]:
+            st.warning(
+                f"🔒 Blocked by your current role's access ({current_role}): "
+                f"{', '.join(result['blocked_tables'])}. This is the exact same "
+                f"access check the chat assistant runs — nothing was special-cased "
+                f"for this tool. Switch to a Leadership role in the sidebar to see it."
+            )
+        elif result["sql_results"]:
+            for table_name, df in result["sql_results"].items():
+                filtered = df[df["segment"] == segment] if "segment" in df.columns else df
+                st.write(f"**{table_name}** — {len(filtered)} deal(s) in `{segment}`")
+                st.dataframe(filtered, use_container_width=True)
+                if "amount_usd" in filtered.columns:
+                    st.metric(f"Total {segment} pipeline", f"${filtered['amount_usd'].sum():,.0f}")
+        else:
+            st.info("No pipeline data matched — retrieval ran but found nothing relevant.")
+
+elif selected_thread_id is None:
     st.title("🧠 Needletail Company Brain")
     st.caption("Prototype — GTM + Human-in-the-loop Operations pilot")
     st.markdown(
