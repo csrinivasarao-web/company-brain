@@ -18,15 +18,17 @@ AGGREGATION: when a question needs a sum/average/count over a routed SQL
 table, that's computed for real with pandas (src/aggregation.py) and
 injected into the context as an explicitly labeled, authoritative block --
 the LLM is instructed (see chat.py's system prompt) to copy those numbers
-rather than re-derive its own from the raw table. This replaces the old
-behavior of handing the LLM a raw table and trusting it to sum correctly
-in prose, which works by luck at small row counts and degrades silently as
-tables grow.
+rather than re-derive its own from the raw table.
+
+NL-TO-SQL (dashboards): a second, separate query path in this same file --
+still Layer 4, still gated by get_allowed_tiers(), but generating a full
+SQL query instead of routing to a fixed table. See nl_to_sql() below.
 """
+import re
 from src.governance import get_allowed_tiers
-from src.gemini_client import embed_texts
+from src.gemini_client import embed_texts, generate_text
 from src.vectorstore import search as vector_search
-from src.sql_store import query
+from src.sql_store import query, get_readonly_connection
 from src.aggregation import detect_aggregation_intent, compute_aggregation, format_for_display
 
 # Simple keyword router for SQL tables. Good enough for a prototype's scope
@@ -137,8 +139,6 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
                 agg_df = compute_aggregation(df, spec)
                 aggregations[table_name] = {"df": agg_df, "spec": spec}
             except Exception:
-                # A malformed aggregation should degrade to "just show the
-                # raw table," never crash the whole retrieval call.
                 pass
 
     # --- Assemble prose context, citing owner + freshness for everything ---
@@ -184,3 +184,183 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
         "allowed_tiers": sorted(allowed_tiers),
         "tiers_touched": tiers_touched,
     }
+
+
+# ===========================================================================
+# NL-to-SQL: a second Layer 4 query path, for the dashboard builder.
+#
+# Trust boundary, stated precisely: the LLM writes a SQL QUERY. It never
+# computes an answer itself. The arithmetic is still 100% deterministic
+# SQLite/pandas code -- exactly the same trust boundary as the aggregation
+# engine above, just extended from "pick from a fixed set of recipes" to
+# "generate the query text." This is NOT "trust the LLM's math" creeping
+# back in through a side door.
+#
+# Three independent guardrails, not one:
+#   1. Schema visibility -- a role only ever sees schemas for tables its
+#      tier already covers. A Rep's prompt never mentions `pipeline`
+#      exists, so the model can't reference what it was never shown.
+#   2. Static validation -- generated SQL must be a single SELECT, must
+#      only reference pre-approved table names, and any write/schema/
+#      pragma keyword rejects it outright before it's ever executed.
+#   3. A genuinely read-only DB connection -- opened via SQLite's URI
+#      mode=ro, so even a validation bug can't result in a write actually
+#      succeeding. Belt AND suspenders, not one or the other.
+# ===========================================================================
+
+TABLE_SCHEMAS = {
+    "pipeline": {
+        "description": "Sales pipeline. One row per deal.",
+        "columns": {
+            "deal_id": "text, unique deal id",
+            "account_name": "text, customer/prospect name",
+            "segment": "text: enterprise, mid_market, or smb",
+            "stage": "text: prospecting, demo, negotiation, closed_won, or closed_lost",
+            "amount_usd": "integer, deal value in USD",
+            "close_date": "text date, YYYY-MM-DD",
+            "owner": "text, sales rep name",
+        },
+    },
+    "payer_coverage": {
+        "description": "Insurance payer integration coverage. One row per payer.",
+        "columns": {
+            "payer_id": "text",
+            "payer_name": "text",
+            "region": "text: National or Regional",
+            "supported": "boolean",
+            "coverage_pct": "integer, 0-100",
+            "integration_status": "text: stable, unstable, voice_fallback_pending, or not_supported",
+            "last_verified": "text date, YYYY-MM-DD",
+        },
+    },
+}
+
+FORBIDDEN_SQL_KEYWORDS = [
+    "insert", "update", "delete", "drop", "alter", "attach", "detach",
+    "pragma", "create", "replace", "transaction", "vacuum", "reindex",
+    "trigger", "grant", "revoke",
+]
+
+NL_TO_SQL_SYSTEM_PROMPT = """You write a single, read-only SQLite SELECT query to answer a business question, using ONLY the tables and columns listed below.
+
+Rules:
+- Output ONLY the raw SQL query. No markdown code fences, no explanation, no semicolon at the end.
+- Must be exactly one SELECT statement. Never write INSERT, UPDATE, DELETE, DROP, ALTER, ATTACH, PRAGMA, CREATE, or multiple statements separated by semicolons.
+- Only reference tables and columns explicitly listed below. Never invent a column or table name, and never reference a table not listed here even if you know it might exist.
+- If the question cannot be answered using only these tables, output exactly: NONE
+
+Available tables:
+{schema_text}
+"""
+
+
+def get_visible_table_schemas(role: str) -> dict:
+    """Only tables this role's tier already covers -- the LLM is never
+    even shown the existence of a table it can't access, which is a
+    stronger guarantee than trusting it to decline to use one it CAN see."""
+    allowed_tiers = get_allowed_tiers(role)
+    table_tiers = _get_table_access_tiers()
+    return {
+        t: schema for t, schema in TABLE_SCHEMAS.items()
+        if table_tiers.get(t) in allowed_tiers
+    }
+
+
+def _format_schema_text(schemas: dict) -> str:
+    parts = []
+    for table_name, schema in schemas.items():
+        cols = "\n".join(f"  - {col}: {desc}" for col, desc in schema["columns"].items())
+        parts.append(f"TABLE {table_name} -- {schema['description']}\n{cols}")
+    return "\n\n".join(parts)
+
+
+def _strip_code_fences(sql: str) -> str:
+    s = sql.strip()
+    if s.startswith("```"):
+        s = re.sub(r"^```[a-zA-Z]*\n?", "", s)
+        s = re.sub(r"\n?```$", "", s)
+    return s.strip().rstrip(";").strip()
+
+
+def validate_sql(sql: str, visible_tables: set) -> tuple:
+    """Returns (is_valid, reason). `visible_tables` is the set this
+    specific role is allowed to see -- checked again here independently
+    of get_visible_table_schemas(), so validation doesn't silently trust
+    that the prompt-construction step got it right."""
+    if not sql or sql.strip().upper() == "NONE":
+        return False, "no_answerable_query"
+
+    lowered = sql.lower().strip()
+    if not lowered.startswith("select"):
+        return False, "not_a_select_statement"
+    if ";" in sql:
+        return False, "multiple_statements_not_allowed"
+
+    for kw in FORBIDDEN_SQL_KEYWORDS:
+        if re.search(rf"\b{kw}\b", lowered):
+            return False, f"forbidden_keyword: {kw}"
+
+    disallowed_tables = set(TABLE_SCHEMAS.keys()) - visible_tables
+    for t in disallowed_tables:
+        if re.search(rf"\b{re.escape(t)}\b", lowered):
+            return False, f"references_disallowed_table: {t}"
+
+    referenced = {t for t in TABLE_SCHEMAS if re.search(rf"\b{re.escape(t)}\b", lowered)}
+    if not referenced:
+        return False, "references_no_known_table"
+
+    return True, "ok"
+
+
+def run_readonly_query(sql: str):
+    """Executes against a connection opened in SQLite's URI read-only
+    mode -- the third guardrail. Even if validate_sql() had a bug, the
+    database file itself refuses to be written to over this connection."""
+    import pandas as pd
+    conn = get_readonly_connection()
+    try:
+        return pd.read_sql_query(sql, conn)
+    finally:
+        conn.close()
+
+
+def pick_chart_type(df) -> str:
+    """Deliberately simple, deterministic chart selection -- not asked of
+    the LLM, for the same reason arithmetic isn't: consistent, predictable
+    behavior over guessing."""
+    if df.shape == (1, 1):
+        return "metric"
+    if df.shape[0] > 1 and df.shape[1] == 2:
+        numeric_cols = df.select_dtypes(include="number").columns
+        if len(numeric_cols) == 1:
+            return "bar"
+    return "table"
+
+
+def nl_to_sql(question: str, role: str) -> dict:
+    """The dashboard builder's entry point. Returns:
+      { "ok": True, "sql": str, "df": DataFrame, "chart_type": str, "tables_used": set }
+      or
+      { "ok": False, "error": str, "detail": str, "sql": str|None }
+    """
+    schemas = get_visible_table_schemas(role)
+    if not schemas:
+        return {"ok": False, "error": "no_visible_tables", "detail": None, "sql": None}
+
+    schema_text = _format_schema_text(schemas)
+    system_instruction = NL_TO_SQL_SYSTEM_PROMPT.format(schema_text=schema_text)
+    raw = generate_text(f"Question: {question}", system_instruction=system_instruction)
+    sql = _strip_code_fences(raw)
+
+    visible_tables = set(schemas.keys())
+    valid, reason = validate_sql(sql, visible_tables)
+    if not valid:
+        return {"ok": False, "error": "invalid_query", "detail": reason, "sql": sql}
+
+    try:
+        df = run_readonly_query(sql)
+    except Exception as e:
+        return {"ok": False, "error": "execution_failed", "detail": str(e), "sql": sql}
+
+    tables_used = {t for t in TABLE_SCHEMAS if re.search(rf"\b{re.escape(t)}\b", sql.lower())}
+    return {"ok": True, "sql": sql, "df": df, "chart_type": pick_chart_type(df), "tables_used": tables_used}
