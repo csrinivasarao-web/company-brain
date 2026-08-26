@@ -15,6 +15,25 @@ Enforces, at the prompt-template level (not left to model discretion):
 Also logs every question to query_log (topic tag + an approximate
 confidence score) so Layer 3's gap detection has real, live data to work
 from -- not just the seeded rows from data/mock/seed/query_log_seed.csv.
+
+Conversation memory: the model is given the last few turns of the CURRENT
+tab's session (passed in by app.py from st.session_state.chat_history) so
+follow-up questions ("what about their contract terms?") read naturally.
+This is deliberately scoped smaller than the "Threads/projects" task on the
+roadmap -- there's no new storage here, nothing persists past this browser
+tab, and no access-tier question arises, since nothing is shared with
+anyone else. Threads/projects is still the right place for persistence
+across sessions and people.
+
+Known limitation, worth stating plainly rather than glossing over: this
+fix makes the ANSWER context-aware, not the RETRIEVAL. If a follow-up is
+elliptical enough that its own wording doesn't retrieve the right chunks on
+its own (e.g. "what about their SLA?" with no company name in it), Layer 4
+may still come back empty even though a human would know what "their"
+refers to from the prior turn. A full fix would rewrite the query using
+history before embedding it -- that's a reasonable next increment if this
+turns out to matter in practice, but it's a separate, larger change from
+what was asked for here, so it's flagged rather than silently bundled in.
 """
 import re
 from datetime import datetime
@@ -42,6 +61,12 @@ Rules, in order of importance:
    fill the gap with outside knowledge. If something was blocked by access
    control, say that plainly too, without revealing its contents.
 5. Be concise. This is an internal tool, not a marketing document.
+6. You may be shown a short excerpt of the recent conversation above the
+   Context section. Use it ONLY to understand what the current question is
+   referring to (e.g. a pronoun, "that account", a follow-up) -- never as a
+   source of facts. Every factual claim must still come only from the
+   Context section for THIS turn, even if something relevant was stated
+   earlier in the conversation.
 """
 
 # --- Confidence scoring --------------------------------------------------
@@ -121,7 +146,22 @@ def _log_query(question: str, topic_tag: str, confidence: float, role: str):
     conn.commit()
 
 
-def get_answer(question: str, role: str) -> dict:
+def _format_history(history: list, max_turns: int = 3) -> str:
+    """history is the app's st.session_state.chat_history, EXCLUDING the
+    current question (app.py passes history[:-1]). Keeps only the last
+    max_turns user+assistant pairs so the prompt doesn't grow unbounded as
+    a conversation gets long."""
+    if not history:
+        return ""
+    recent = history[-(max_turns * 2):]
+    lines = []
+    for msg in recent:
+        speaker = "User" if msg["role"] == "user" else "Assistant"
+        lines.append(f"{speaker}: {msg['content']}")
+    return "\n".join(lines)
+
+
+def get_answer(question: str, role: str, history: list = None) -> dict:
     """Returns:
       {
         "answer": str,
@@ -130,6 +170,11 @@ def get_answer(question: str, role: str) -> dict:
         "topic_tag": str,
         "declined": bool,      # True if the LLM was skipped (nothing retrieved)
       }
+
+    `history` should be the CURRENT tab's session_state.chat_history with
+    the current question already removed (app.py passes history[:-1]).
+    Lives only in this browser tab's memory -- see module docstring for why
+    this is intentionally smaller than Threads/projects.
     """
     retrieval_result = retrieve(question, role)
     confidence = _score_confidence(retrieval_result)
@@ -144,7 +189,14 @@ def get_answer(question: str, role: str) -> dict:
         )
         declined = True
     else:
+        history_text = _format_history(history)
+        history_block = (
+            f"Recent conversation so far (for understanding what this question "
+            f"refers to only -- NOT a source of facts):\n{history_text}\n\n"
+            if history_text else ""
+        )
         user_prompt = (
+            f"{history_block}"
             f"Context:\n{retrieval_result['context_text']}\n\n"
             f"Question: {question}"
         )
