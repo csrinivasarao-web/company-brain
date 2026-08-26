@@ -80,6 +80,7 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
         "sql_results": { table_name: DataFrame, ... },
         "blocked_tables": [ table_name, ... ],  # relevant but role lacks access
         "allowed_tiers": [ ... ],
+        "tiers_touched": { ... },  # union of tiers actually used in this answer
       }
     """
     allowed_tiers = get_allowed_tiers(role)
@@ -128,9 +129,6 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
             f"{_df_to_markdown(df)}"
         )
     if blocked_tables:
-        # Tells the LLM (and the person) that relevant data exists but was
-        # withheld by access control -- not silently dropped. This reveals
-        # only that a named table exists, never its values.
         context_parts.append(
             f"[Note: {', '.join(blocked_tables)} data looked relevant to this "
             f"question but is outside this role's access and was not retrieved.]"
@@ -138,10 +136,16 @@ def retrieve(question: str, role: str, k: int = 5) -> dict:
 
     context_text = "\n\n---\n\n".join(context_parts) if context_parts else ""
 
+    tiers_touched = {hit["access_tier"] for hit in vector_hits if hit.get("access_tier")}
+    for table_name in sql_results:
+        tiers_touched.add(table_tiers.get(table_name))
+    tiers_touched.discard(None)
+
     return {
         "context_text": context_text,
         "vector_hits": vector_hits,
         "sql_results": sql_results,
         "blocked_tables": blocked_tables,
         "allowed_tiers": sorted(allowed_tiers),
+        "tiers_touched": tiers_touched,
     }
