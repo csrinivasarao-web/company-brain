@@ -22,6 +22,18 @@ time, against the CURRENT viewer, never the thread's creator. Being
 invited to a thread is necessary but never sufficient: an invite can never
 override this check.
 
+Enforcement point: get_thread() and get_messages() both require a
+requesting_user_id and check can_view() INTERNALLY, before returning
+anything -- title, metadata, or message content. This used to be enforced
+only at the call site (app.py only ever passed a thread_id that had
+already been filtered through list_visible_threads()), which is fragile:
+it depends on every future caller remembering to replicate that filtering
+themselves. Enforcing it inside the data-access functions means a caller
+that forgets, or a new caller altogether (e.g. Task 8's build API), gets a
+safe default -- None or [] -- rather than a silent leak. Same principle as
+Layer 4's access-tier-inside-the-query-itself: check it where the data is
+fetched, not wherever happens to call the fetch.
+
 There's no real login system in this prototype, so "people" are simulated
 via a small set of named demo users, each tied to one of the four RBAC
 roles - this is what makes "share this thread with Priya specifically"
@@ -113,19 +125,9 @@ def append_message(thread_id: int, role: str, content: str, meta: dict = None, t
     conn.commit()
 
 
-def get_messages(thread_id: int) -> list:
-    conn = get_connection()
-    rows = conn.execute(
-        "SELECT role, content, meta, created_at FROM thread_messages WHERE thread_id=? ORDER BY message_id",
-        (thread_id,),
-    ).fetchall()
-    return [
-        {"role": r[0], "content": r[1], "meta": json.loads(r[2]) if r[2] else {}, "created_at": r[3]}
-        for r in rows
-    ]
-
-
-def get_thread(thread_id: int) -> dict:
+def _fetch_thread_row(thread_id: int) -> dict:
+    """Raw fetch, no access check -- internal use only (can_view() needs
+    this without recursing into itself via the public, gated get_thread())."""
     conn = get_connection()
     row = conn.execute(
         "SELECT thread_id, title, created_by, created_at, required_tiers FROM threads WHERE thread_id=?",
@@ -140,13 +142,45 @@ def get_thread(thread_id: int) -> dict:
 
 
 def can_view(thread_id: int, user_id: str) -> bool:
-    thread = get_thread(thread_id)
+    thread = _fetch_thread_row(thread_id)
     if not thread:
         return False
     required = set(thread["required_tiers"])
     role = DEMO_USERS[user_id]["role"]
     allowed = get_allowed_tiers(role)
     return required.issubset(allowed)
+
+
+def get_thread(thread_id: int, requesting_user_id: str) -> dict:
+    """Returns the thread's metadata (title, creator, required tiers) only
+    if requesting_user_id currently clears its access bar -- checked here,
+    not trusted to the caller. Returns None if the thread doesn't exist OR
+    if access is denied; deliberately the same return value for both, so a
+    caller can't distinguish "no such thread" from "not authorized" and
+    accidentally leak which thread_ids exist to someone unauthorized."""
+    thread = _fetch_thread_row(thread_id)
+    if not thread:
+        return None
+    if not can_view(thread_id, requesting_user_id):
+        return None
+    return thread
+
+
+def get_messages(thread_id: int, requesting_user_id: str) -> list:
+    """Same enforcement as get_thread(). Returns [] rather than raising on
+    a denied/missing thread, so a caller can iterate the result safely
+    without a try/except just to handle the authorization boundary."""
+    if not can_view(thread_id, requesting_user_id):
+        return []
+    conn = get_connection()
+    rows = conn.execute(
+        "SELECT role, content, meta, created_at FROM thread_messages WHERE thread_id=? ORDER BY message_id",
+        (thread_id,),
+    ).fetchall()
+    return [
+        {"role": r[0], "content": r[1], "meta": json.loads(r[2]) if r[2] else {}, "created_at": r[3]}
+        for r in rows
+    ]
 
 
 def list_visible_threads(user_id: str) -> list:
