@@ -10,11 +10,11 @@ from src.threads import (
     create_project, list_projects_for_user,
 )
 from src.dashboards import (
-    create_dashboard, share_dashboard, revoke_dashboard_share,
+    create_dashboard, delete_dashboard, share_dashboard, revoke_dashboard_share,
     get_shared_with as get_dashboard_shared_with,
     list_visible_dashboards, get_dashboard_result,
 )
-from src.aggregation import TABLE_AGG_CONFIG, compute_aggregation
+from src.retrieval import nl_to_sql
 
 st.set_page_config(page_title="Needletail Company Brain", page_icon="🧠", layout="wide")
 
@@ -152,6 +152,8 @@ if "active_tool" not in st.session_state:
     st.session_state.active_tool = None
 if "selected_dashboard_id" not in st.session_state:
     st.session_state.selected_dashboard_id = None
+if "db_last_result" not in st.session_state:
+    st.session_state.db_last_result = None
 
 with st.sidebar:
     st.markdown("### 🧠 Company Brain")
@@ -193,6 +195,7 @@ with st.sidebar:
         st.session_state.active_tool = "dashboard_builder"
         st.session_state.selected_thread_id = None
         st.session_state.selected_dashboard_id = None
+        st.session_state.db_last_result = None
         st.rerun()
 
     st.divider()
@@ -279,46 +282,62 @@ selected_dashboard_id = st.session_state.selected_dashboard_id
 if st.session_state.active_tool == "dashboard_builder":
     st.title("📊 New dashboard")
     st.caption(
-        "Saves a RECIPE (table, group-by, aggregation function) — never a "
-        "result. Every time this dashboard is opened, it re-runs the real "
-        "pandas aggregation live, through the same access-scoped retrieve() "
-        "path as everything else. Nothing here is cached or pre-computed."
+        "Type a question. An LLM writes the SQL query — it never computes "
+        "the answer itself, SQLite does. The generated SQL is shown below "
+        "for the same reason citations are shown in chat: so you can check "
+        "it, not just trust it. Saving freezes this exact query; every "
+        "future open re-runs it live, never a cached result."
     )
 
-    table_name = st.selectbox("Table:", list(TABLE_AGG_CONFIG.keys()), key="db_table")
-    config = TABLE_AGG_CONFIG[table_name]
-    columns = sorted(set(config["groupable_synonyms"].values()))
+    nl_question = st.text_input(
+        "What do you want to see?", placeholder="e.g. How is our pipeline looking by segment?",
+        key="db_question",
+    )
 
-    group_by = st.multiselect("Group by:", columns, key="db_group_by")
-    agg_func = st.selectbox("Function:", ["sum", "mean", "count"], key="db_agg_func")
-    agg_column = None
-    if agg_func != "count":
-        agg_column = st.selectbox("Aggregate column:", [config["numeric_column"]], key="db_agg_col")
+    if st.button("▶ Generate & preview", key="db_generate"):
+        result = nl_to_sql(nl_question, current_role)
+        st.session_state.db_last_result = result
+        st.session_state.db_last_question = nl_question
 
-    if st.button("▶ Preview (live, real pandas)", key="db_preview"):
-        df = query(f"SELECT * FROM {table_name}")
-        spec = {"group_by": group_by, "agg_func": agg_func, "numeric_col": agg_column}
-        try:
-            preview_df = compute_aggregation(df, spec)
-            st.dataframe(preview_df, use_container_width=True)
-            st.session_state.db_preview_ok = True
-        except Exception as e:
-            st.error(f"Couldn't compute that: {e}")
-            st.session_state.db_preview_ok = False
-
-    st.divider()
-    dash_title = st.text_input("Dashboard title:", placeholder="e.g. Pipeline by segment", key="db_title")
-    if st.button("💾 Save as Dashboard", key="db_save"):
-        if not dash_title.strip():
-            st.warning("Give it a title first.")
+    last_result = st.session_state.get("db_last_result")
+    if last_result:
+        if not last_result["ok"]:
+            error = last_result["error"]
+            if error == "no_visible_tables":
+                st.warning(f"Your current role ({current_role}) doesn't have access to any table this could be built on.")
+            elif error == "invalid_query":
+                st.error(f"Generated query was rejected: {last_result['detail']}")
+                st.code(last_result["sql"] or "(empty)", language="sql")
+            elif error == "execution_failed":
+                st.error(f"Query failed to run: {last_result['detail']}")
+                st.code(last_result["sql"], language="sql")
         else:
-            new_id = create_dashboard(
-                dash_title.strip(), current_user_id, table_name,
-                group_by=group_by, agg_func=agg_func, agg_column=agg_column,
+            st.code(last_result["sql"], language="sql")
+            df = last_result["df"]
+            if last_result["chart_type"] == "metric" and not df.empty:
+                st.metric(df.columns[0], df.iloc[0, 0])
+            elif last_result["chart_type"] == "bar" and not df.empty:
+                st.bar_chart(df.set_index(df.columns[0]))
+            else:
+                st.dataframe(df, use_container_width=True)
+
+            st.divider()
+            dash_title = st.text_input(
+                "Dashboard title:", placeholder="e.g. Pipeline by segment", key="db_title",
             )
-            st.session_state.selected_dashboard_id = new_id
-            st.session_state.active_tool = None
-            st.rerun()
+            if st.button("💾 Save as Dashboard", key="db_save"):
+                if not dash_title.strip():
+                    st.warning("Give it a title first.")
+                else:
+                    new_id = create_dashboard(
+                        dash_title.strip(), current_user_id,
+                        st.session_state.db_last_question, last_result["sql"],
+                        last_result["chart_type"], last_result["tables_used"],
+                    )
+                    st.session_state.selected_dashboard_id = new_id
+                    st.session_state.active_tool = None
+                    st.session_state.db_last_result = None
+                    st.rerun()
 
 elif selected_dashboard_id is not None:
     result = get_dashboard_result(selected_dashboard_id, current_user_id)
@@ -333,25 +352,34 @@ elif selected_dashboard_id is not None:
             st.subheader(d["title"])
             st.error(
                 f"🔒 Blocked by your current role's access ({current_role}). "
-                f"This dashboard is built on `{d['table_name']}`, which requires "
-                f"`{result['required_tier']}` access. This is checked fresh every "
-                f"time you open it, against your CURRENT role — not whoever "
-                f"created it, and not cached from a previous visit."
+                f"This dashboard requires `{', '.join(result['required_tiers'])}` "
+                f"access. Checked fresh every time you open it, against your "
+                f"CURRENT role — not whoever created it."
             )
+        elif result["reason"] == "execution_failed":
+            st.subheader(result["dashboard"]["title"])
+            st.error(f"This dashboard's saved query failed to run: {result['detail']}")
+            st.code(result["dashboard"]["sql_query"], language="sql")
         else:
             st.warning("This dashboard no longer exists.")
             st.session_state.selected_dashboard_id = None
             st.stop()
     else:
         d = result["dashboard"]
+        df = result["df"]
         st.subheader(f"📊 {d['title']}")
-        st.caption(
-            f"Created by {DEMO_USERS[d['created_by']]['name']} · table: `{d['table_name']}` · "
-            f"{d['agg_func']}({d['agg_column'] or ''}) grouped by "
-            f"{', '.join(d['group_by']) or '(none — overall total)'}"
-        )
+        st.caption(f"Created by {DEMO_USERS[d['created_by']]['name']} · \"{d['question']}\"")
         st.caption("Recomputed live, just now — not a cached or stored result.")
-        st.dataframe(result["result_display"], use_container_width=True)
+
+        if d["chart_type"] == "metric" and not df.empty:
+            st.metric(df.columns[0], df.iloc[0, 0])
+        elif d["chart_type"] == "bar" and not df.empty:
+            st.bar_chart(df.set_index(df.columns[0]))
+        else:
+            st.dataframe(df, use_container_width=True)
+
+        with st.expander("Frozen SQL query"):
+            st.code(d["sql_query"], language="sql")
 
         dash_shared_with = get_dashboard_shared_with(selected_dashboard_id)
         other_users_d = [u for u in list(DEMO_USERS.keys()) if u != current_user_id]
@@ -370,6 +398,13 @@ elif selected_dashboard_id is not None:
         for uid in dash_shared_set - dash_target_set:
             if uid != current_user_id:
                 revoke_dashboard_share(selected_dashboard_id, uid)
+
+        if d["created_by"] == current_user_id:
+            st.divider()
+            if st.button("🗑️ Delete this dashboard", key=f"del_{selected_dashboard_id}"):
+                delete_dashboard(selected_dashboard_id, current_user_id)
+                st.session_state.selected_dashboard_id = None
+                st.rerun()
 
 elif st.session_state.active_tool == "pipeline_lookup":
     st.title("🔧 Pipeline Lookup")
