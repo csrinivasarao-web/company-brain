@@ -327,13 +327,24 @@ def run_readonly_query(sql: str):
 def pick_chart_type(df) -> str:
     """Deliberately simple, deterministic chart selection -- not asked of
     the LLM, for the same reason arithmetic isn't: consistent, predictable
-    behavior over guessing."""
+    behavior over guessing.
+
+    FIXED: previously only recognized exactly 2 columns (one category, one
+    number), so any two-dimension group-by -- e.g. "amount by segment AND
+    stage", which naturally produces 3 columns -- fell through to a plain
+    table with no chart and no explanation. Now recognizes 1 OR 2
+    non-numeric (category) columns alongside 1+ numeric columns as
+    chartable; app.py's rendering pivots the two-category case so both
+    dimensions actually show up in the chart, rather than one of them
+    silently getting dropped or mis-typed as a value."""
+    if df.empty:
+        return "table"
     if df.shape == (1, 1):
         return "metric"
-    if df.shape[0] > 1 and df.shape[1] == 2:
-        numeric_cols = df.select_dtypes(include="number").columns
-        if len(numeric_cols) == 1:
-            return "bar"
+    numeric_cols = df.select_dtypes(include="number").columns
+    non_numeric_cols = [c for c in df.columns if c not in numeric_cols]
+    if df.shape[0] > 1 and len(numeric_cols) >= 1 and len(non_numeric_cols) in (1, 2):
+        return "bar"
     return "table"
 
 
