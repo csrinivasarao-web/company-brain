@@ -37,6 +37,60 @@ def _render_sources(retrieval: dict):
             st.write("Nothing retrieved for this question.")
 
 
+def _render_query_result(df):
+    """Shared by the dashboard builder's live preview AND the saved-
+    dashboard view -- previously this rendering logic was duplicated
+    identically in both places, which is exactly how a fix applied to one
+    can silently miss the other. One function now, two callers.
+
+    Chart choice is recomputed from the ACTUAL result shape every time,
+    rather than trusting a frozen "bar"/"table" label -- more robust, and
+    self-correcting if a query's shape ever changes.
+
+    - 1x1 -> a single metric.
+    - 1 category column + 1+ numeric columns -> bar chart, all numeric
+      columns as grouped series against the category.
+    - 2 category columns + 1 numeric column (e.g. segment AND stage) ->
+      PIVOTED first, so the second category becomes its own series rather
+      than being handed to the chart as if it were a number. This was the
+      actual bug: a two-dimension group-by has 3 columns, which the old
+      logic didn't recognize as chartable at all, so it silently fell back
+      to a plain table with no explanation.
+    - Anything else -> table only.
+
+    The underlying table is always shown too (except for a single metric,
+    where the number already is the whole answer) -- the chart is
+    additive, not a replacement, for the same "show your work" reason
+    citations are shown in chat.
+    """
+    if df.empty:
+        st.info("Query ran successfully but returned no rows.")
+        return
+
+    if df.shape == (1, 1):
+        st.metric(df.columns[0], df.iloc[0, 0])
+        return
+
+    numeric_cols = list(df.select_dtypes(include="number").columns)
+    non_numeric_cols = [c for c in df.columns if c not in numeric_cols]
+
+    charted = False
+    if len(numeric_cols) >= 1 and len(non_numeric_cols) == 1 and df.shape[0] > 1:
+        st.bar_chart(df.set_index(non_numeric_cols[0]))
+        charted = True
+    elif len(numeric_cols) == 1 and len(non_numeric_cols) == 2 and df.shape[0] > 1:
+        try:
+            pivoted = df.pivot(index=non_numeric_cols[0], columns=non_numeric_cols[1], values=numeric_cols[0])
+            st.bar_chart(pivoted)
+            charted = True
+        except Exception:
+            pass  # falls through to the table below if pivoting fails for any reason
+
+    st.dataframe(df, use_container_width=True)
+    if not charted and df.shape[0] > 1:
+        st.caption("Shown as a table — this result's shape doesn't map cleanly to a single bar chart.")
+
+
 @st.cache_resource(show_spinner="Running ingestion — chunking docs, summarizing the call transcript, embedding, loading SQL tables...")
 def get_ingestion_report():
     return run_ingestion()
@@ -313,13 +367,7 @@ if st.session_state.active_tool == "dashboard_builder":
                 st.code(last_result["sql"], language="sql")
         else:
             st.code(last_result["sql"], language="sql")
-            df = last_result["df"]
-            if last_result["chart_type"] == "metric" and not df.empty:
-                st.metric(df.columns[0], df.iloc[0, 0])
-            elif last_result["chart_type"] == "bar" and not df.empty:
-                st.bar_chart(df.set_index(df.columns[0]))
-            else:
-                st.dataframe(df, use_container_width=True)
+            _render_query_result(last_result["df"])
 
             st.divider()
             dash_title = st.text_input(
@@ -371,12 +419,7 @@ elif selected_dashboard_id is not None:
         st.caption(f"Created by {DEMO_USERS[d['created_by']]['name']} · \"{d['question']}\"")
         st.caption("Recomputed live, just now — not a cached or stored result.")
 
-        if d["chart_type"] == "metric" and not df.empty:
-            st.metric(df.columns[0], df.iloc[0, 0])
-        elif d["chart_type"] == "bar" and not df.empty:
-            st.bar_chart(df.set_index(df.columns[0]))
-        else:
-            st.dataframe(df, use_container_width=True)
+        _render_query_result(df)
 
         with st.expander("Frozen SQL query"):
             st.code(d["sql_query"], language="sql")
