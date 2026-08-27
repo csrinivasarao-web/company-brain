@@ -15,6 +15,10 @@ from src.dashboards import (
     list_visible_dashboards, get_dashboard_result,
 )
 from src.retrieval import nl_to_sql
+from src.call_metrics import (
+    get_visible_transcripts, extract_call_metrics,
+    METRIC_LABELS, build_cross_call_table,
+)
 
 st.set_page_config(page_title="Needletail Company Brain", page_icon="🧠", layout="wide")
 
@@ -35,60 +39,6 @@ def _render_sources(retrieval: dict):
                 st.markdown(f"- `{t}` (not visible at this role's access level)")
         if not retrieval.get("vector_hits") and not retrieval.get("sql_results"):
             st.write("Nothing retrieved for this question.")
-
-
-def _render_query_result(df):
-    """Shared by the dashboard builder's live preview AND the saved-
-    dashboard view -- previously this rendering logic was duplicated
-    identically in both places, which is exactly how a fix applied to one
-    can silently miss the other. One function now, two callers.
-
-    Chart choice is recomputed from the ACTUAL result shape every time,
-    rather than trusting a frozen "bar"/"table" label -- more robust, and
-    self-correcting if a query's shape ever changes.
-
-    - 1x1 -> a single metric.
-    - 1 category column + 1+ numeric columns -> bar chart, all numeric
-      columns as grouped series against the category.
-    - 2 category columns + 1 numeric column (e.g. segment AND stage) ->
-      PIVOTED first, so the second category becomes its own series rather
-      than being handed to the chart as if it were a number. This was the
-      actual bug: a two-dimension group-by has 3 columns, which the old
-      logic didn't recognize as chartable at all, so it silently fell back
-      to a plain table with no explanation.
-    - Anything else -> table only.
-
-    The underlying table is always shown too (except for a single metric,
-    where the number already is the whole answer) -- the chart is
-    additive, not a replacement, for the same "show your work" reason
-    citations are shown in chat.
-    """
-    if df.empty:
-        st.info("Query ran successfully but returned no rows.")
-        return
-
-    if df.shape == (1, 1):
-        st.metric(df.columns[0], df.iloc[0, 0])
-        return
-
-    numeric_cols = list(df.select_dtypes(include="number").columns)
-    non_numeric_cols = [c for c in df.columns if c not in numeric_cols]
-
-    charted = False
-    if len(numeric_cols) >= 1 and len(non_numeric_cols) == 1 and df.shape[0] > 1:
-        st.bar_chart(df.set_index(non_numeric_cols[0]))
-        charted = True
-    elif len(numeric_cols) == 1 and len(non_numeric_cols) == 2 and df.shape[0] > 1:
-        try:
-            pivoted = df.pivot(index=non_numeric_cols[0], columns=non_numeric_cols[1], values=numeric_cols[0])
-            st.bar_chart(pivoted)
-            charted = True
-        except Exception:
-            pass  # falls through to the table below if pivoting fails for any reason
-
-    st.dataframe(df, use_container_width=True)
-    if not charted and df.shape[0] > 1:
-        st.caption("Shown as a table — this result's shape doesn't map cleanly to a single bar chart.")
 
 
 @st.cache_resource(show_spinner="Running ingestion — chunking docs, summarizing the call transcript, embedding, loading SQL tables...")
@@ -208,6 +158,10 @@ if "selected_dashboard_id" not in st.session_state:
     st.session_state.selected_dashboard_id = None
 if "db_last_result" not in st.session_state:
     st.session_state.db_last_result = None
+if "ci_single_result" not in st.session_state:
+    st.session_state.ci_single_result = None
+if "ci_cross_table" not in st.session_state:
+    st.session_state.ci_cross_table = None
 
 with st.sidebar:
     st.markdown("### 🧠 Company Brain")
@@ -227,6 +181,11 @@ with st.sidebar:
     st.caption("Independent mini-tools built on Layer 4 — not the chat UI.")
     if st.button("🔧 Pipeline Lookup", key="tool_pipeline_btn", use_container_width=True):
         st.session_state.active_tool = "pipeline_lookup"
+        st.session_state.selected_thread_id = None
+        st.session_state.selected_dashboard_id = None
+        st.rerun()
+    if st.button("📞 Call Insights", key="tool_calls_btn", use_container_width=True):
+        st.session_state.active_tool = "call_insights"
         st.session_state.selected_thread_id = None
         st.session_state.selected_dashboard_id = None
         st.rerun()
@@ -367,7 +326,13 @@ if st.session_state.active_tool == "dashboard_builder":
                 st.code(last_result["sql"], language="sql")
         else:
             st.code(last_result["sql"], language="sql")
-            _render_query_result(last_result["df"])
+            df = last_result["df"]
+            if last_result["chart_type"] == "metric" and not df.empty:
+                st.metric(df.columns[0], df.iloc[0, 0])
+            elif last_result["chart_type"] == "bar" and not df.empty:
+                st.bar_chart(df.set_index(df.columns[0]))
+            else:
+                st.dataframe(df, use_container_width=True)
 
             st.divider()
             dash_title = st.text_input(
@@ -419,7 +384,12 @@ elif selected_dashboard_id is not None:
         st.caption(f"Created by {DEMO_USERS[d['created_by']]['name']} · \"{d['question']}\"")
         st.caption("Recomputed live, just now — not a cached or stored result.")
 
-        _render_query_result(df)
+        if d["chart_type"] == "metric" and not df.empty:
+            st.metric(df.columns[0], df.iloc[0, 0])
+        elif d["chart_type"] == "bar" and not df.empty:
+            st.bar_chart(df.set_index(df.columns[0]))
+        else:
+            st.dataframe(df, use_container_width=True)
 
         with st.expander("Frozen SQL query"):
             st.code(d["sql_query"], language="sql")
@@ -449,7 +419,72 @@ elif selected_dashboard_id is not None:
                 st.session_state.selected_dashboard_id = None
                 st.rerun()
 
-elif st.session_state.active_tool == "pipeline_lookup":
+elif st.session_state.active_tool == "call_insights":
+    st.title("📞 Call Insights")
+    st.caption(
+        "A third independent tool, same pattern as Pipeline Lookup — governed "
+        "by the same access check as everything else. The LLM extracts facts "
+        "stated in each transcript; it never judges trend direction — that's "
+        "left to you, reading the table."
+    )
+
+    transcripts = get_visible_transcripts(current_role)
+    if not transcripts:
+        st.warning(f"Your current role ({current_role}) has no visible call transcripts.")
+    else:
+        accounts = sorted(set(t["account"] for t in transcripts))
+        tab1, tab2 = st.tabs(["Within a call", "Across calls"])
+
+        with tab1:
+            account = st.selectbox("Account:", accounts, key="ci_account_single")
+            calls = [t for t in transcripts if t["account"] == account]
+            call_labels = [f"{t['last_verified']} — {t['title']}" for t in calls]
+            idx = st.selectbox("Call:", range(len(calls)), format_func=lambda i: call_labels[i], key="ci_call_single")
+            selected_call = calls[idx]
+
+            if st.button("Extract metrics", key="ci_extract_single"):
+                with st.spinner("Extracting..."):
+                    result = extract_call_metrics(selected_call["doc_id"], selected_call["filename"])
+                st.session_state.ci_single_result = result
+
+            result = st.session_state.get("ci_single_result")
+            if result:
+                if not result.get("ok"):
+                    st.error(f"Extraction failed: {result.get('error')}")
+                    st.code(result.get("raw", ""))
+                else:
+                    for key, label in METRIC_LABELS:
+                        val = result.get(key)
+                        display = "; ".join(val) if isinstance(val, list) else (val or "Not mentioned")
+                        st.markdown(f"**{label}:** {display}")
+
+        with tab2:
+            account2 = st.selectbox("Account:", accounts, key="ci_account_cross")
+            calls2 = [t for t in transcripts if t["account"] == account2]
+            st.caption(f"{len(calls2)} call(s) for {account2}, in chronological order.")
+
+            if st.button("Extract all & compare", key="ci_extract_cross"):
+                with st.spinner(f"Extracting {len(calls2)} calls..."):
+                    extractions = []
+                    ok = True
+                    for t in calls2:
+                        r = extract_call_metrics(t["doc_id"], t["filename"])
+                        if not r.get("ok"):
+                            ok = False
+                            st.error(f"Extraction failed for {t['title']}: {r.get('error')}")
+                            break
+                        extractions.append(r)
+                    if ok:
+                        st.session_state.ci_cross_table = build_cross_call_table(extractions)
+                        st.session_state.ci_cross_labels = [f"{t['last_verified']}" for t in calls2]
+
+            cross_table = st.session_state.get("ci_cross_table")
+            if cross_table:
+                import pandas as pd
+                df = pd.DataFrame(cross_table, index=st.session_state.ci_cross_labels).T
+                st.dataframe(df, use_container_width=True)
+
+
     st.title("🔧 Pipeline Lookup")
     st.caption(
         "A second, independent tool — built on the exact same `retrieve()` "
