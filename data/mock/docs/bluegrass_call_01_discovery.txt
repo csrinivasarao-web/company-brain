@@ -1,0 +1,118 @@
+CALL TRANSCRIPT — Discovery call
+Account: Bluegrass Dental Group (prospect, mid-market, 14 locations, Denticon)
+Date: 2026-08-19 | Rep: J. Alvarez | Owner: GTM Sales | Access tier: team_restricted_gtm
+
+[00:00] REP: Thanks for hopping on. So, tell me a bit about how eligibility verification works today at Bluegrass.
+
+[00:45] PROSPECT: Right now we've got two front-desk staff per location basically on hold with payers half the day. Delta Dental is our biggest payer and honestly their portal is a nightmare — it logs us out constantly.
+
+[01:30] REP: When that happens, what does the staff member actually do? Do they retry, call the payer, or push it to billing?
+
+[01:55] PROSPECT: Usually they retry once or twice. If that fails, they call. If they can't get through quickly, somebody puts it in a pending bucket and comes back to it later. That's where things get messy.
+
+[02:25] REP: How often would you say a verification gets left pending long enough that it becomes a same-day problem?
+
+[02:50] PROSPECT: A few dozen a week across the group. It gets worse on Mondays and after holidays because everybody is trying to get caught up.
+
+[03:20] REP: Are the fourteen locations all following the same process, or does each office have its own version?
+
+[03:40] PROSPECT: The policy is the same, but execution is different. Some managers are very disciplined. Others basically let the team work the list when they have time.
+
+[04:10] REP: And who notices when verification hasn't happened before the appointment?
+
+[04:30] PROSPECT: Usually the front desk. Sometimes the hygienist or treatment coordinator discovers it when they're already talking to the patient.
+
+[04:55] REP: That probably makes the financial conversation harder, because the office is trying to estimate patient responsibility while also figuring out whether the payer information is current.
+
+[05:15] PROSPECT: Exactly. Patients aren't very patient when they hear a number and then get a different number later.
+
+[05:40] REP: What are you doing today for Delta specifically? Is it all through the payer portal?
+
+[06:00] PROSPECT: Mostly portal. We have a few staff members who know some workarounds, but that's tribal knowledge and not something I want to depend on.
+
+[06:25] REP: That's a useful distinction. Are there other payers that create the same amount of friction, or is Delta the one you'd most want fixed?
+
+[06:45] PROSPECT: Delta is the one I'd fix first. Volume-wise it matters the most and the portal experience is the worst.
+
+[07:10] REP: Roughly how many eligibility checks are you doing in a week?
+
+[07:30] PROSPECT: Around four hundred, give or take. During a busy week it can be closer to four-fifty.
+
+[07:55] REP: And how much of that would you estimate is manual staff time rather than just data being reviewed?
+
+[08:15] PROSPECT: I haven't measured it precisely. My guess is one person at each office loses a meaningful chunk of the day to it. If I had to put a number on it, maybe two to three hours per day at some offices.
+
+[08:45] REP: That's substantial. What was the trigger for looking at this now rather than six months ago?
+
+[09:05] PROSPECT: We're watching labor costs more closely. I don't want to add another person just to keep up with administrative work. Also, our revenue-cycle team is seeing avoidable cleanup when verification notes are incomplete.
+
+[09:35] REP: So the business case is labor efficiency, but there is also downstream impact on billing and collections.
+
+[09:50] PROSPECT: Right.
+
+[10:10] REP: I want to ask about your previous automation experience because this tends to be the make-or-break issue. Have you tried an automated verification product before?
+
+[10:35] PROSPECT: Two years ago. It looked great in the sales demo. Then it gave us incorrect benefits information. Not just a little off — enough that the front desk gave patients the wrong expectations.
+
+[11:00] REP: What happened operationally after that?
+
+[11:20] PROSPECT: We had to go back manually, explain the discrepancy to patients, adjust estimates, and in some cases eat the difference because it was already too late to have the conversation differently.
+
+[11:45] REP: That makes sense. So when you evaluate us, accuracy isn't simply 'did the system find the member.' You need the benefit detail to be reliable enough for the office to use.
+
+[12:10] PROSPECT: Yes. That's the part I care about most.
+
+[12:35] REP: Our workflow automates the portal check and can use a voice fallback if the portal path times out, so staff aren't stuck waiting on a browser session. We also have a human QA step before a verification is marked complete, especially where the information is unusual or ambiguous.
+
+[13:10] PROSPECT: Is the QA step every verification or only exceptions?
+
+[13:25] REP: The completion workflow includes QA review, with additional attention for exceptions. I don't want to oversimplify that on a first call, so I'll show you exactly how the statuses work in the demo.
+
+[13:50] PROSPECT: Okay. What's turnaround time?
+
+[14:00] REP: Typically minutes, not hours, for the portal path.
+
+[14:15] PROSPECT: And when it isn't?
+
+[14:30] REP: If a case is flagged for review, it can take longer because a QA specialist is looking at it manually. I don't have the exact SLA for those flagged cases in front of me, so I'd rather verify it than guess.
+
+[14:55] PROSPECT: That's fine. I'd rather have an accurate answer.
+
+[15:15] REP: Let's talk about your technology environment. I have Denticon listed for the group.
+
+[15:25] PROSPECT: Fourteen locations, but two of the newer offices came through an acquisition and they're on Curve Dental.
+
+[15:50] REP: Are those two operated the same way as the other twelve?
+
+[16:05] PROSPECT: Same policies, but they're still integrating with the rest of the group. That's another reason I don't want to make them part of phase one.
+
+[16:25] REP: That makes sense. One thing I want to flag now rather than promise something I can't confirm: Curve Dental integration is newer for us, and I need to verify the exact voice-fallback coverage for that PMS.
+
+[16:50] PROSPECT: Good. Don't tell me yes just to get me through the funnel.
+
+[17:05] REP: Agreed. For a first rollout, we'd focus on the twelve Denticon locations and prove the workflow there.
+
+[17:30] PROSPECT: What would the rollout require from our side?
+
+[17:45] REP: The main inputs are access, a definition of what counts as complete, the teams or locations in scope, and a baseline for current verification volume and labor. We'd use the demo to get specific about the operating workflow.
+
+[18:10] PROSPECT: I can get you those numbers. I don't want a three-month implementation project, though.
+
+[18:25] REP: Understood. We'll separate what is required to start from what could be optimized later.
+
+[18:45] REP: Before we wrap, what would make you say this is worth continuing after the demo?
+
+[19:05] PROSPECT: Three things. First, it has to genuinely take work away from the front desk. Second, I need confidence that we're not trading labor savings for bad coverage information. Third, I need pricing that makes sense at our volume.
+
+[19:35] REP: That's clear. I'll bring the workflow, the QA path, and pricing into the next conversation. I'll also come back with the exact SLA for flagged cases and the Curve Dental voice-fallback answer.
+
+[19:55] PROSPECT: Good. Send me the Growth tier pricing and let's get the demo on the calendar.
+
+--- CALL NOTES ---
+Objection raised: prior bad experience with automated verification tool giving incorrect coverage and benefit information.
+Feature request / open question: exact voice fallback coverage on Curve Dental; rep did not have an answer, flagged for follow-up.
+Operational pain points: Delta Dental portal timeouts, manual payer calls, pending verification queue, inconsistent location-level execution.
+Business driver: reduce front-desk labor without increasing verification-related financial risk.
+Initial scope preference: 12 Denticon locations; defer 2 Curve Dental locations.
+Competitor mentioned: none named directly, described as a prior automated verification tool from 2 years ago.
+Follow-up owed: (1) exact SLA for flagged/QA-reviewed verifications, (2) Curve Dental voice fallback status, (3) Growth tier pricing, (4) demo focused on Denticon workflow and QA.

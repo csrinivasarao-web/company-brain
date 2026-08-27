@@ -1,0 +1,129 @@
+CALL TRANSCRIPT — Negotiation call
+Account: Bluegrass Dental Group (prospect, mid-market, 14 locations, Denticon)
+Date: 2026-08-25 | Rep: J. Alvarez | Owner: GTM Sales | Access tier: team_restricted_gtm
+
+[00:00] REP: Thanks for making time. I sent the two pricing scenarios and the three-location pilot outline. What did you and the COO think?
+
+[00:45] PROSPECT: We like the product more than I expected. The concern is price. The twelve-location Growth scenario is higher than what I had budgeted.
+
+[01:10] REP: Is the concern the absolute amount, or that the savings case doesn't yet justify it?
+
+[01:35] PROSPECT: Both. I can defend spending money if we can prove we are actually removing work. But I'm not going to ask the COO to approve a new line item based on a theoretical number.
+
+[02:00] REP: That's reasonable. How are you thinking about the value internally?
+
+[02:20] PROSPECT: If this genuinely takes two or three hours of work a day out of an office, that's meaningful. But I want to test whether that happens in reality, not just on a spreadsheet.
+
+[02:45] REP: Then the pilot should be the proof mechanism. We can agree on baseline measures before launch and compare them to the same measures during the pilot.
+
+[03:05] PROSPECT: What exactly would you measure?
+
+[03:20] REP: I'd suggest verification volume, manual handling time, number of requests requiring payer calls, completion time, exception volume, and the number of cases that require rework. You can decide which of those map most closely to your operating goals.
+
+[03:55] PROSPECT: I also want to track patient-impacting errors. That's the thing that could kill this internally.
+
+[04:10] REP: Agreed. We should define a quality metric around incorrect or materially incomplete verification results and document how those cases are handled.
+
+[04:35] PROSPECT: Exactly.
+
+[04:55] REP: On the pricing, would a phased commercial structure help? For example, keep the pilot limited to the three agreed locations and have expansion pricing tied to moving into the remaining Denticon offices.
+
+[05:20] PROSPECT: Potentially. I don't want to negotiate a totally different contract every time we add a location.
+
+[05:35] REP: Understood. The cleaner option is a pilot scope with a defined expansion schedule or price basis so everyone knows what happens if the pilot succeeds.
+
+[05:55] PROSPECT: Could we do the pilot at no additional implementation fee?
+
+[06:15] REP: I can't commit to changing commercial terms on this call without checking, but I can take that request back. What matters is that we separate implementation economics from the recurring platform cost so you can compare them fairly.
+
+[06:45] PROSPECT: That's one of my concerns. Vendors love to make the recurring number look good and then surprise you with implementation costs.
+
+[07:05] REP: We should avoid that. I'll put all known costs in one view and identify anything conditional rather than burying it.
+
+[07:25] PROSPECT: Another issue is volume. Four hundred checks a week is an estimate. Some months will be higher.
+
+[07:45] REP: Then we should make sure the pricing model is transparent about what happens above the assumed volume. I don't want you signing up for a model that becomes unpredictable during a busy month.
+
+[08:05] PROSPECT: Exactly. What happens if we hit five hundred or six hundred a week?
+
+[08:20] REP: I'll confirm the exact overage mechanics for the Growth tier and put them in the commercial summary. I don't want to improvise a threshold.
+
+[08:40] PROSPECT: Good.
+
+[09:00] REP: Let's talk about procurement. If the COO says yes to the pilot, who else needs to approve it?
+
+[09:20] PROSPECT: COO, finance, and our revenue-cycle director. IT needs to bless the access and integration, but they aren't the economic buyer.
+
+[09:45] REP: And legal?
+
+[10:00] PROSPECT: Legal sees anything involving patient information, so yes.
+
+[10:15] REP: That's helpful. We should build that into the sequence rather than treat it as a last-minute hurdle.
+
+[10:35] PROSPECT: Also, our office managers will want to know what their day actually looks like after go-live.
+
+[10:50] REP: I'd include them in the pilot training. We can show them the queue, the exception statuses, and the point at which they should intervene versus let the workflow continue.
+
+[11:10] PROSPECT: I have one manager who is very skeptical of automation. She'll be the hardest person to win over.
+
+[11:25] REP: Then she's exactly who I'd want involved early. If the workflow works for her, that's stronger validation than getting a friendly manager to say it looks good.
+
+[11:50] PROSPECT: Fair.
+
+[12:10] REP: On the Curve Dental locations, the COO asked why we wouldn't just include them from the start.
+
+[12:25] PROSPECT: Yes, she did.
+
+[12:40] REP: My recommendation remains to keep them separate because the voice-fallback behavior is not at the same maturity level as the Denticon workflow. I think it's better to prove the operating model where the workflow is strongest, then revisit the acquired offices with a specific technical plan.
+
+[13:10] PROSPECT: I agree. I told her I'd rather have a clean pilot than try to prove everything at once.
+
+[13:30] REP: Great. That also gives us a cleaner baseline because we're not mixing two PMS environments.
+
+[13:50] PROSPECT: Here's the number I'd be comfortable with: if the pilot is clearly structured and we have an agreed expansion price, I can probably get the COO comfortable. But I need some flexibility on the starting cost.
+
+[14:15] REP: What would that flexibility need to look like?
+
+[14:30] PROSPECT: Reduced pilot fee, delayed first invoice, or some credit toward expansion. Any of those could work.
+
+[14:50] REP: I can take those three structures back as alternatives. I wouldn't want to promise one before commercial approval.
+
+[15:10] PROSPECT: That's fine.
+
+[15:30] REP: Is there a target date you're working toward for making a decision?
+
+[15:50] PROSPECT: I'd like to decide this week if we can get the economics and pilot terms cleaned up. We have an internal operations meeting Friday.
+
+[16:10] REP: Then I'll optimize the proposal around that meeting. I'd suggest we make the decision package very simple: scope, baseline metrics, pilot success criteria, total cost, expansion cost, and responsibilities on each side.
+
+[16:35] PROSPECT: Yes. My COO doesn't want a 20-page vendor deck.
+
+[16:55] REP: Neither do I for this stage.
+
+[17:15] PROSPECT: One other question: what happens if the pilot works operationally but the office doesn't hit the labor-savings target?
+
+[17:30] REP: Then we'd separate workflow adoption from economic outcome. If completion quality and process reliability improve but the labor reduction is smaller than expected, we'd look at why before assuming expansion. We should define that upfront rather than moving the goalposts afterward.
+
+[17:55] PROSPECT: Good answer.
+
+[18:15] REP: And if the pilot hits the target, would you be comfortable expanding to the remaining nine Denticon locations immediately?
+
+[18:25] PROSPECT: Assuming finance signs off on the expansion price, yes. I don't want another six-month evaluation cycle.
+
+[18:45] REP: That's useful. So the expansion decision can be pre-agreed and triggered by the pilot criteria rather than restarting procurement from zero.
+
+[19:10] PROSPECT: Exactly.
+
+[19:30] REP: I'll send the revised structure with the pilot-cost options, expansion basis, volume assumptions, and the quality metric. Then you can take that into Friday's meeting.
+
+[19:50] PROSPECT: Do that. If the numbers are reasonable, I think we're close.
+
+--- CALL NOTES ---
+Commercial objection: Growth tier price is above initial budget; prospect needs a defensible ROI case and predictable expansion economics.
+Negotiation requests: (1) reduced or waived pilot implementation fee, (2) delayed first invoice, or (3) credit toward expansion; rep to confirm internally.
+Value validation requested: baseline and pilot measurement of verification volume, manual handling time, payer-call volume, completion time, exception/rework rate, and patient-impacting verification errors.
+Procurement path: COO, finance, revenue-cycle director, IT for access/integration, and legal for patient-information review.
+Scope decision: retain 3-location pilot within Denticon; defer 2 Curve Dental locations because voice-fallback behavior is less mature.
+Expansion signal: prospect willing to expand to remaining 9 Denticon locations after successful pilot, subject to finance approval of pre-agreed expansion pricing.
+Decision timing: prospect targeting internal decision during Friday operations meeting.
+Next step: provide revised commercial structure, pilot economics, expansion price basis, volume assumptions, and measurable success criteria.

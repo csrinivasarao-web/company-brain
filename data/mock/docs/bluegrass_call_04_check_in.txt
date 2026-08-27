@@ -1,0 +1,135 @@
+CALL TRANSCRIPT — Check-in call
+Account: Bluegrass Dental Group (prospect, mid-market, 14 locations, Denticon)
+Date: 2026-08-27 | Rep: J. Alvarez | Owner: GTM Sales | Access tier: team_restricted_gtm
+
+[00:00] REP: Thanks for making time. I wanted to check in after the revised pilot proposal and see where things landed internally.
+
+[00:40] PROSPECT: The COO is supportive. Finance had questions, but they're manageable. The main thing they want is confidence that the pilot won't turn into a project with hidden work for our team.
+
+[01:05] REP: That's fair. What specifically did they worry would create internal work?
+
+[01:25] PROSPECT: Data cleanup, access setup, training, and then somebody having to monitor the system all day. They don't want us to replace one manual queue with another manual queue.
+
+[01:50] REP: That's a good distinction. The pilot should be designed around exception management, not having someone sit there and watch every verification. We'll document the setup responsibilities and the ongoing office responsibilities separately.
+
+[02:15] PROSPECT: That helps. I also showed them the QA workflow. That was probably the part that made the biggest difference.
+
+[02:35] REP: What resonated about it?
+
+[02:50] PROSPECT: The fact that a questionable result doesn't just look finished. Our previous experience made them very wary of automation that gives a clean-looking answer without enough confidence behind it.
+
+[03:10] REP: Good. We'll make that a formal pilot criterion: the office needs clear visibility into completed versus review-status work.
+
+[03:35] PROSPECT: Yes.
+
+[03:55] REP: I also revised the commercial proposal to distinguish the three-location pilot from expansion. Did finance have an issue with the expansion pricing?
+
+[04:15] PROSPECT: No. They actually liked having it spelled out. Their question was volume protection. They don't want a busy month to trigger an unexpected bill.
+
+[04:35] REP: I included the Growth-tier volume assumption and the overage treatment in the revised summary. I'll make sure the contract language matches the commercial sheet so there's no mismatch.
+
+[05:00] PROSPECT: That's important.
+
+[05:20] REP: Where are you on the pilot locations? Last time you had a high-volume, average, and challenged office in mind.
+
+[05:40] PROSPECT: We've selected them. The high-volume office is Lexington, the average one is Nicholasville, and the challenged one is our Winchester location.
+
+[06:05] REP: Great spread. Are those all on the same Denticon configuration?
+
+[06:15] PROSPECT: Yes. There are some workflow differences between managers, but not the PMS setup.
+
+[06:35] REP: That's ideal for isolating the operational variable rather than introducing a technology variable.
+
+[06:55] PROSPECT: Exactly.
+
+[07:15] REP: I want to revisit one thing from our first call: how much manual effort do you think you're putting in right now?
+
+[07:35] PROSPECT: We did a quick count. Across those three pilot offices, we're averaging around thirty-five staff hours a week on eligibility-related work, and that excludes some manager time.
+
+[07:55] REP: That's a much better baseline than our earlier estimate. Did you break out payer calls versus portal work?
+
+[08:15] PROSPECT: Yes. About half is portal work, maybe another quarter is payer calls and rework, and the rest is checking information and documenting it.
+
+[08:35] REP: Excellent. Then the pilot can measure whether we're reducing each component rather than just looking at one top-line number.
+
+[08:55] PROSPECT: Our revenue-cycle director also wants to watch downstream rework.
+
+[09:10] REP: I'd include that. If the system is faster but creates more cleanup later, the net value isn't there.
+
+[09:30] PROSPECT: Right.
+
+[09:50] REP: Any new concerns since we last spoke?
+
+[10:10] PROSPECT: One. Our managers asked what happens when the payer portal changes its layout. They don't want to be responsible for fixing integrations every time a payer updates a screen.
+
+[10:30] REP: That's a fair operational question. The portal automation is managed as part of the service rather than expecting the dental office to maintain the payer workflow. Your team should not be maintaining those payer-specific mechanics.
+
+[10:55] PROSPECT: Good. I wanted that stated clearly.
+
+[11:15] REP: We can put that responsibility in the implementation document so it's explicit.
+
+[11:35] PROSPECT: Please do.
+
+[11:55] REP: On training, I'd recommend a manager session and then a short front-desk workflow session. The emphasis shouldn't be on teaching people how the automation works internally; it should be on how to submit, interpret status, handle exceptions, and know when a result is safe to use.
+
+[12:20] PROSPECT: That's exactly how I want it positioned.
+
+[12:40] REP: How much time can the pilot offices realistically give us for training?
+
+[12:55] PROSPECT: Thirty minutes for front desk, maybe forty-five for managers. Anything longer and they'll push back.
+
+[13:15] REP: That's workable. We'll keep the training focused.
+
+[13:35] PROSPECT: Another thing: the COO wants a single owner on our side. She doesn't want every office manager emailing you separately.
+
+[13:50] REP: That makes sense. We can use one Bluegrass owner for the pilot, with the three managers acting as site contacts for operational feedback.
+
+[14:10] PROSPECT: I'll be the overall owner. The revenue-cycle director will be the escalation point for quality questions.
+
+[14:30] REP: Perfect.
+
+[14:50] PROSPECT: What happens if one office has a problem and another doesn't? I don't want the whole pilot judged a failure because one manager refuses to use it.
+
+[15:10] REP: We should treat adoption and system performance separately. If the workflow performs but one site doesn't follow the process, that's a site-level adoption issue. We'd still investigate it, but we shouldn't confuse it with technical or quality failure.
+
+[15:30] PROSPECT: Good. That distinction will matter when we review results.
+
+[15:50] REP: Then I'd propose the pilot scorecard have four categories: operational time saved, verification quality, exception handling, and user adoption.
+
+[16:10] PROSPECT: Add patient impact.
+
+[16:25] REP: Absolutely. That can sit under quality as a separate metric so it's not lost.
+
+[16:45] PROSPECT: Good.
+
+[17:05] REP: Where does finance stand now on the commercial side?
+
+[17:25] PROSPECT: They are okay with the revised pilot economics. They want the expansion pricing written the same way it was discussed, and then they're ready to approve.
+
+[17:45] REP: Understood. I'll make sure the paperwork reflects the three-location pilot, the agreed expansion basis, the volume assumption, and the scope boundary for the Curve Dental offices.
+
+[18:05] PROSPECT: Once that is clean, we're ready to move.
+
+[18:25] REP: That's great. One last thing: after the pilot, assuming the metrics are strong, would you still want the nine additional Denticon offices to roll out without another evaluation cycle?
+
+[18:40] PROSPECT: Yes. That's what the COO wants. She doesn't want us spending another quarter deciding something we've already validated.
+
+[19:00] REP: Then we'll make the expansion path explicit from day one, including who signs off on the scorecard.
+
+[19:20] PROSPECT: I like that.
+
+[19:40] REP: I'll send the final pilot paperwork with those points reflected.
+
+[19:55] PROSPECT: Good. Assuming nothing unexpected shows up in the paperwork, we're moving forward.
+
+--- CALL NOTES ---
+Status: strong late-stage prospect; COO supportive, finance aligned pending clean final paperwork.
+New baseline data: selected three pilot offices average approximately 35 staff hours per week on eligibility-related work, excluding some manager time; roughly half portal work, one quarter payer calls/rework, remainder information checking/documentation.
+Pilot locations: Lexington (high volume), Nicholasville (average), Winchester (operationally challenged); all Denticon.
+Success criteria refined: operational time saved, verification quality, exception handling, user adoption, and patient-impacting errors.
+Implementation concern: prospect wants no hidden internal workload and no requirement for Bluegrass staff to maintain payer-specific portal mechanics.
+Operating model: one Bluegrass pilot owner; revenue-cycle director as escalation point for quality; site managers as local contacts.
+Commercial status: revised pilot economics acceptable; finance wants expansion pricing and volume assumptions reflected consistently in final paperwork.
+Expansion intent: successful pilot should trigger rollout to remaining 9 Denticon offices without a second evaluation cycle.
+Curve Dental scope: 2 acquired Curve Dental locations remain outside the initial pilot/expansion path until voice-fallback maturity is addressed.
+Next step: send final pilot paperwork with scope, pricing, volume treatment, responsibilities, scorecard, and Curve Dental boundary.

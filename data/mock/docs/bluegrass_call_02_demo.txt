@@ -1,0 +1,122 @@
+CALL TRANSCRIPT — Demo call
+Account: Bluegrass Dental Group (prospect, mid-market, 14 locations, Denticon)
+Date: 2026-08-21 | Rep: J. Alvarez | Owner: GTM Sales | Access tier: team_restricted_gtm
+
+[00:00] REP: Good to see you again. Last time you said the three things that mattered were taking work away from the front desk, maintaining accuracy, and making the economics work. I'll keep those as the lens for the demo.
+
+[00:45] PROSPECT: That's exactly right. I also wanted the answers on the flagged-case SLA and Curve Dental.
+
+[01:05] REP: I have both updates. For flagged cases, the exact SLA depends on the review path, so I don't want to give you one universal number that isn't accurate. The standard portal path is still measured in minutes, while exceptions can take longer. On Curve Dental, the integration is supported in the broader workflow, but I confirmed that the voice-fallback behavior has limitations versus Denticon. That's why I still recommend keeping the two acquired offices out of phase one.
+
+[01:40] PROSPECT: Okay. That's probably the right approach anyway.
+
+[02:05] REP: Great. I'm going to start with what your staff sees. Imagine the morning queue for one of the twelve Denticon offices. The office doesn't need to manually log into the payer portal for each patient. The verification request is submitted, the workflow determines the appropriate path, and the status comes back into the queue.
+
+[02:45] PROSPECT: Where does the staff member see whether it worked?
+
+[03:00] REP: Here. You have the patient, payer, request status, and verification outcome. The point is that the office is managing exceptions instead of manually driving every request.
+
+[03:35] PROSPECT: What does 'exception' actually mean?
+
+[03:50] REP: For example, a portal returns incomplete information, there is an unexpected response, or the system can't confidently reconcile something. Rather than silently presenting a questionable result as complete, the case is routed for review.
+
+[04:20] PROSPECT: That's important. With the tool we had before, the problem wasn't that it failed. The problem was that it looked successful when the information was wrong.
+
+[04:40] REP: That's exactly why the review state matters. We want the office to know whether a result is complete, pending review, or otherwise needs attention.
+
+[05:05] PROSPECT: Can I see the actual benefit information or just a yes/no eligibility result?
+
+[05:20] REP: The workflow captures benefit details available through the verification path. The specific fields depend on what the payer returns, but the intent is to preserve the information the office needs rather than reducing it to a simple active/inactive status.
+
+[05:55] PROSPECT: What happens when Delta's portal logs out?
+
+[06:05] REP: That's where the fallback comes in. If the portal path times out or can't complete, the workflow can route to the voice-agent path where supported. The staff member doesn't have to stop the queue and start dialing the payer manually.
+
+[06:35] PROSPECT: How much of that is automatic versus someone watching the queue?
+
+[06:50] REP: The routing is automated. Human attention comes in on the QA side and when something is genuinely exceptional.
+
+[07:15] PROSPECT: Can an office manager see how much time we're actually saving?
+
+[07:30] REP: We can provide operational reporting around request volume, completion, and exception handling. For your pilot, I'd recommend we establish a baseline first so the before-and-after comparison is meaningful.
+
+[07:50] PROSPECT: I'd want that. Otherwise someone can say we saved time and nobody can prove it.
+
+[08:10] REP: Agreed. Let's make the baseline part of kickoff, not an afterthought.
+
+[08:35] PROSPECT: How does this fit with Denticon? I don't want my staff doing duplicate entry.
+
+[08:50] REP: For the Denticon locations, the goal is to fit into the existing eligibility workflow rather than create a separate process. During implementation, we'd confirm the specific data fields and handoffs your team uses today.
+
+[09:20] PROSPECT: What about notes? Our managers complain that every office writes notes differently.
+
+[09:35] REP: That's an area where standardization can help. You can define what information is expected in the record so that the output is more consistent across locations.
+
+[10:00] PROSPECT: That sounds useful for revenue cycle too.
+
+[10:15] REP: Exactly. Verification isn't just a front-desk task. The downstream value is having a more consistent record when someone has to investigate a patient balance.
+
+[10:40] PROSPECT: Let's go back to QA. Who exactly is the human reviewing it?
+
+[11:00] REP: A QA specialist reviews the verification before it's marked complete. I don't want to imply they're manually redoing every single step. The role is to validate the result and investigate situations where the output needs additional attention.
+
+[11:25] PROSPECT: That's better than 'AI checked it,' but how do I know the QA team is any better than the staff we already have?
+
+[11:45] REP: The advantage is specialization and standardization. Your front-desk team is interrupted by patients, phones, and scheduling. The QA function is dedicated to verification quality. We'll also define escalation rules rather than leave everything to individual judgment.
+
+[12:15] PROSPECT: Okay. Show me what happens when the system cannot get a clean answer.
+
+[12:30] REP: In that case, the status moves into review instead of being treated as complete. The office can see that it isn't final. The QA specialist works the exception, and the result is updated when resolved.
+
+[13:00] PROSPECT: Does the patient ever get a number before that happens?
+
+[13:15] REP: The operational rule should be that staff don't treat an unverified or review-status result as a final financial commitment. We'd align that with your internal policy during rollout.
+
+[13:40] PROSPECT: That's important. Our previous vendor basically encouraged people to trust the output too early.
+
+[14:05] REP: Understood. We should make that distinction explicit in training.
+
+[14:25] PROSPECT: How long would it take to roll out the twelve Denticon offices?
+
+[14:40] REP: We can structure it in a focused rollout rather than turning on all twelve blindly. I'd start with a small subset, verify the workflow, then expand. The timeline depends on access and configuration, so I don't want to invent a calendar before we've confirmed those dependencies.
+
+[15:10] PROSPECT: I can get you the access and volume information. Could we pilot at three locations first?
+
+[15:25] REP: Yes, that would be a sensible structure. I'd pick locations with representative Delta volume rather than simply the easiest offices.
+
+[15:45] PROSPECT: Good. I have one high-volume office, one average office, and one that struggles operationally.
+
+[16:05] REP: That's almost an ideal test group because it lets us see whether the workflow holds up under different conditions.
+
+[16:25] PROSPECT: What's the Growth tier cost you mentioned?
+
+[16:35] REP: Based on the volume you've shared, the Growth tier is the appropriate starting point. I'll send the exact pricing in writing after the call so you have a clean number tied to the expected scope rather than me giving you a rough figure verbally.
+
+[16:55] PROSPECT: Can we get an estimate for twelve versus all fourteen too? I want to know whether we're being penalized for the acquired offices later.
+
+[17:10] REP: Yes. I'll separate the twelve-Denticon phase-one economics from the fourteen-location scenario and clearly call out the Curve Dental assumption.
+
+[17:30] PROSPECT: Good.
+
+[17:50] REP: Before we close, based on what you've seen, what's still making you hesitate?
+
+[18:05] PROSPECT: Two things. One is whether the savings are large enough to matter. The other is whether my office managers will actually trust the workflow.
+
+[18:25] REP: For the first, the pilot baseline will give us evidence instead of relying on a generic productivity claim. For the second, I'd make the exception states and QA process part of manager training so they can see exactly when not to trust a preliminary result.
+
+[18:55] PROSPECT: I like that. I don't want this positioned as 'the system replaces judgment.'
+
+[19:10] REP: Agreed. It's more accurate to say the system handles the repeatable work and gives people a clear path when judgment is actually required.
+
+[19:35] PROSPECT: Send me the two pricing scenarios and the pilot outline. I'll review with our COO.
+
+[19:55] REP: Will do. I'll also include the outstanding Curve Dental limitation so nobody is surprised later.
+
+--- CALL NOTES ---
+Demo outcome: prospect understood automated portal workflow, fallback routing, exception handling, QA review, and standardized verification output.
+Objection raised: concern that the prior vendor appeared successful while returning incorrect benefit information; prospect wants explicit distinction between preliminary results and verified/completed results.
+Pilot preference: 3 Denticon locations — one high-volume, one average, one operationally challenged.
+Decision criteria: measurable front-desk labor reduction, confidence in verification quality, manager adoption, and acceptable Growth-tier economics.
+Open commercial request: pricing for 12-location Denticon phase one versus 14-location scenario including 2 Curve Dental offices.
+Open technical item: Curve Dental voice-fallback limitations to remain documented in scope.
+Next step: send pricing scenarios, pilot outline, baseline measurement approach, and written Curve Dental assumption; prospect to review with COO.
