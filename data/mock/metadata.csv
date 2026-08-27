@@ -2,7 +2,6 @@ doc_id,filename,title,team,owner,access_tier,last_verified,format,topic_tags
 DOC-001,docs/gtm_icp_definitions.md,Ideal Customer Profile - DSO Segments,GTM,GTM Strategy,public_internal,2026-08-18,markdown,icp;segments;pms_fit
 DOC-002,docs/gtm_pricing_packaging.md,Pricing & Packaging FY26,GTM,GTM Strategy,team_restricted_gtm,2026-08-12,markdown,pricing;packaging;discounting
 DOC-003,docs/gtm_battlecard_competitor_x.md,Competitive Battlecard,GTM,GTM Strategy,team_restricted_gtm,2026-08-10,markdown,competitive;objection_handling
-DOC-004,docs/gtm_call_transcript_deltadental_prospect.txt,Discovery Call - Bluegrass Dental Group,GTM,GTM Sales,team_restricted_gtm,2026-08-19,transcript,call_transcript;curve_dental_integration;sla
 DOC-005,docs/gtm_onboarding_playbook_carestack.md,Customer Onboarding Playbook - CareStack,GTM,GTM Customer Success,team_restricted_gtm,2026-03-02,markdown,onboarding;carestack
 DOC-006,docs/gtm_onboarding_playbook_denticon.md,Customer Onboarding Playbook - Denticon,GTM,GTM Customer Success,team_restricted_gtm,2026-08-14,markdown,onboarding;denticon
 DOC-007,docs/gtm_escalation_runbook.md,Customer Escalation Runbook,GTM,GTM Customer Success,team_restricted_gtm,2026-08-16,markdown,escalation;sla;re_auth
